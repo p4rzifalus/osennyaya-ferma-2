@@ -176,12 +176,13 @@ export function createScene(container) {
     return ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3()) ?? new THREE.Vector3();
   }
 
-  // Поставить камеру под угол a, сохранив точку focus в центре экрана
-  function setYaw(a, focus) {
+  // Поставить камеру под угол a, сохранив точку focus в центре экрана.
+  // scale — масштаб (во время поворота задаём сами, чтобы мир не «дышал»), иначе — по размеру сцены
+  function setYaw(a, focus, scale) {
     yaw = a;
     placeCamera(a);
     measureScene();
-    view.scale = fitScale();
+    view.scale = scale ?? fitScale();
     const p = toView(focus);
     view.center.set(p.x, p.y, 0);
   }
@@ -203,13 +204,17 @@ export function createScene(container) {
     update(dt, time, followPos) {
       if (turning) {
         turning.t = Math.min(1, turning.t + (CAMERA.rotateTime > 0 ? dt / CAMERA.rotateTime : 1));
-        const e = turning.t * turning.t * (3 - 2 * turning.t); // мягкий старт и остановка
-        setYaw(turning.from + (turning.to - turning.from) * e, turning.focus);
+        const t = turning.t;
+        const e = t * t * t * (t * (t * 6 - 15) + 10); // очень мягкий разгон и остановка
+        // масштаб плавно идёт от начального к конечному — без отъезда на полпути
+        const scale = turning.fromScale + (turning.toScale - turning.fromScale) * e;
+        setYaw(turning.from + (turning.to - turning.from) * e, turning.focus, scale);
         if (turning.t >= 1) turning = null;
       }
 
       // Крупный план — от вида «вся сцена», поэтому на телефоне (где и так ближе) крот того же размера
-      const zoomTarget = closeUp ? Math.max(1.25, (wholeSceneScale() * CAMERA.closeUpZoom) / view.scale) : 1;
+      // во время поворота приближение не пересчитываем — иначе оно тоже «гуляет»
+      const zoomTarget = turning ? zoom : closeUp ? Math.max(1.25, (wholeSceneScale() * CAMERA.closeUpZoom) / view.scale) : 1;
       zoom += (zoomTarget - zoom) * Math.min(1, dt * 6);
       if (Math.abs(zoomTarget - zoom) < 0.001) zoom = zoomTarget;
 
@@ -239,7 +244,14 @@ export function createScene(container) {
       turn = (turn + step + 4) % 4;
       targetYaw += step * (Math.PI / 2); // камера идёт вокруг острова — мир на экране крутится по часовой
       const focus = turning?.focus ?? (closeUp && focusPos ? focusPos.clone().setY(0) : groundAtCenter());
-      turning = { from: yaw, to: targetYaw, t: 0, focus };
+      // масштаб в конце поворота: ненадолго ставим камеру в конечную точку и меряем сцену
+      const from = yaw;
+      placeCamera(targetYaw);
+      measureScene();
+      const toScale = fitScale();
+      placeCamera(from);
+      measureScene();
+      turning = { from, to: targetYaw, t: 0, focus, fromScale: view.scale, toScale };
     },
     // Сразу поставить нужный поворот (при загрузке сохранения)
     setTurn(n, focusPos) {
