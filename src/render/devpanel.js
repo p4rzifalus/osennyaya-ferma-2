@@ -8,6 +8,7 @@ const STORAGE_KEY = 'ogorod2-fx';
 
 export function loadFxSettings(quality) {
   const settings = { ...FX };
+  if (!import.meta.env.DEV) return settings; // в опубликованной игре — ровно как в config.js
   try {
     Object.assign(settings, JSON.parse(localStorage.getItem(STORAGE_KEY)) || {});
   } catch { /* нет сохранённого — берём из config.js */ }

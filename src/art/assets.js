@@ -34,7 +34,7 @@ function aoFromHeight(height) {
 
 // Рельеф и шероховатость из самой картинки: яркость = высота (светлое выступает, тёмное в щелях)
 function mapsFromImage(image, strength) {
-  const size = 512; // рабочий размер: хватает для рельефа и считается быстро
+  const size = Math.min(512, textureLimit / 2); // рабочий размер: хватает для рельефа и считается быстро
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d');
@@ -92,6 +92,7 @@ const realisticRoughness = (name) => REALISTIC[name]?.roughness ?? 1;
 function loadRealistic(material, name, strength) {
   const loader = new THREE.TextureLoader();
   loader.load(userFile(name), (tex) => {
+    tex.image = fitImage(tex.image);
     const old = { map: material.map, normalMap: material.normalMap, roughnessMap: material.roughnessMap, aoMap: material.aoMap };
     material.map = smoothSettings(tex, THREE.SRGBColorSpace);
     const { normal, rough, ao, size } = mapsFromImage(tex.image, strength);
@@ -121,6 +122,21 @@ function replaceFromFile(material, slot, url) {
 }
 
 const cache = new Map();
+
+// Предел размера реалистичных картинок (на слабом качестве — меньше: меньше памяти, быстрее старт)
+let textureLimit = 1024;
+export function setTextureLimit(size) {
+  textureLimit = size;
+}
+
+// Уменьшить картинку, если она больше предела
+function fitImage(image) {
+  if (image.width <= textureLimit) return image;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = textureLimit;
+  canvas.getContext('2d').drawImage(image, 0, 0, textureLimit, textureLimit);
+  return canvas;
+}
 
 // Все созданные материалы с текстурами (для намокания под дождём)
 export const allMaterials = () => cache.values();

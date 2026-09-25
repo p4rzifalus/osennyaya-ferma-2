@@ -136,11 +136,12 @@ export const MOLE_REACH = 0.55;
 //   particles   — множитель количества частиц
 //   lanternShadows — сколько фонарей отбрасывают тени (тени от фонарей дорогие)
 //   lanternLights  — сколько фонарей по-настоящему светят (остальные — только светящееся стекло)
+//   textureSize    — предел размера картинок-текстур (на телефоне меньше — меньше памяти)
 export const QUALITY = {
-  low:    { tiltShift: false, msaa: 0, maxDpr: 1, shadowMap: 1024, ao: false, godRays: false, particles: 0.4, lanternShadows: 0, lanternLights: 3 },
-  medium: { tiltShift: true, msaa: 2, maxDpr: 1.25, shadowMap: 1024, ao: false, godRays: true, particles: 0.7, lanternShadows: 0, lanternLights: 5 },
-  high:   { tiltShift: true, msaa: 2, maxDpr: 1.5, shadowMap: 2048, ao: true, godRays: true, particles: 1, lanternShadows: 1, lanternLights: 7 },
-  ultra:  { tiltShift: true, msaa: 4, maxDpr: 2, shadowMap: 4096, ao: true, godRays: true, particles: 1.5, lanternShadows: 3, lanternLights: 7 },
+  low:    { tiltShift: false, msaa: 0, maxDpr: 1, shadowMap: 1024, ao: false, godRays: false, particles: 0.4, lanternShadows: 0, lanternLights: 3, textureSize: 512 },
+  medium: { tiltShift: true, msaa: 2, maxDpr: 1.25, shadowMap: 1024, ao: false, godRays: true, particles: 0.7, lanternShadows: 0, lanternLights: 5, textureSize: 1024 },
+  high:   { tiltShift: true, msaa: 2, maxDpr: 1.5, shadowMap: 2048, ao: true, godRays: true, particles: 1, lanternShadows: 1, lanternLights: 7, textureSize: 1024 },
+  ultra:  { tiltShift: true, msaa: 4, maxDpr: 2, shadowMap: 4096, ao: true, godRays: true, particles: 1.5, lanternShadows: 3, lanternLights: 7, textureSize: 1024 },
 };
 
 // Вечерний свет

@@ -12,6 +12,7 @@ import { createUI, TOOLS } from './ui.js';
 import { createDecor } from './decor.js';
 import { detectQuality } from './render/quality.js';
 import { createPipeline } from './render/pipeline.js';
+import { setTextureLimit } from './art/assets.js';
 import { createLighting } from './render/lighting.js';
 import { createWeather } from './render/weather.js';
 import { createEffects } from './world/effects.js';
@@ -21,6 +22,7 @@ import { createDevPanel, loadFxSettings } from './render/devpanel.js';
 import { loadGame, saveGame, clearSave } from './save.js';
 
 const quality = detectQuality();
+setTextureLimit(quality.textureSize); // на слабом качестве картинки уменьшаются при загрузке
 const { renderer, scene, camera, cameraControl, world, basket, landmarks, island } = createScene(document.body);
 const lighting = createLighting(renderer, scene, quality, landmarks.island); // тени — только над ровной серединой острова
 const lanterns = createLanterns(scene, quality);
@@ -28,7 +30,8 @@ const effects = createEffects(scene, quality, lanterns.positions);
 const weather = createWeather(scene, quality, lighting, landmarks.island);
 const fx = loadFxSettings(quality);
 const pipeline = createPipeline(renderer, scene, camera, fx, quality);
-const devPanel = createDevPanel(fx, pipeline, quality, weather);
+// Панель настройки (G) — только при разработке; в опубликованной игре её нет
+const devPanel = import.meta.env.DEV ? createDevPanel(fx, pipeline, quality, weather) : null;
 
 // ---------- Правила ----------
 let restarting = false; // во время «начать заново» не сохраняем
@@ -180,7 +183,7 @@ renderer.setAnimationLoop((now) => {
   placeOn(frontMarker, frontCell());
 
   pipeline.render(dt);
-  devPanel.tick(now);
+  devPanel?.tick(now);
 });
 
 // Только для разработки: доступ к игре из консоли браузера (game.restart() — начать заново)
