@@ -1,61 +1,32 @@
-// Конвейер картинки «крупные пиксели, гладкий свет»:
-// 1) сцена рисуется в уменьшенную картинку (уже со светом и тенями),
-// 2) картинка растягивается на экран без сглаживания — пиксели чёткие,
-// 3) поверх в полном разрешении: свечение, тональная коррекция, цветокоррекция, виньетка, зерно.
+// Конвейер картинки: сцена рисуется в полном разрешении со сглаживанием краёв,
+// поверх — свечение, тональная коррекция, цветокоррекция, виньетка, зерно.
 import * as THREE from 'three';
 import {
-  EffectComposer, EffectPass, Pass, CopyMaterial,
+  EffectComposer, EffectPass, RenderPass,
   BloomEffect, ToneMappingEffect, ToneMappingMode, LUT3DEffect, VignetteEffect, NoiseEffect, BlendFunction,
 } from 'postprocessing';
+import { N8AOPostPass } from 'n8ao';
 import { createLUTs } from './luts.js';
-
-// Проход 1–2: рисуем сцену маленькой и растягиваем без сглаживания
-class PixelRenderPass extends Pass {
-  constructor(scene, camera, settings) {
-    super('PixelRenderPass');
-    this.gameScene = scene;
-    this.gameCamera = camera;
-    this.settings = settings;
-    this.needsSwap = false; // пишем прямо во входную картинку, как обычный RenderPass
-    this.lowRes = new THREE.WebGLRenderTarget(1, 1, {
-      type: THREE.HalfFloatType, // запас яркости сверх белого — чтобы свечение было «горячим»
-      minFilter: THREE.NearestFilter,
-      magFilter: THREE.NearestFilter,
-    });
-    this.fullscreenMaterial = new CopyMaterial();
-    this.bufferSize = new THREE.Vector2(1, 1);
-    this.pixelRatio = 1;
-  }
-
-  // Размер маленькой картинки: экран, делённый на размер пикселя
-  updateLowResSize() {
-    const px = this.settings.pixelScale * this.pixelRatio;
-    this.lowRes.setSize(Math.max(1, Math.ceil(this.bufferSize.x / px)), Math.max(1, Math.ceil(this.bufferSize.y / px)));
-  }
-
-  setSize(width, height) {
-    this.bufferSize.set(width, height);
-    this.updateLowResSize();
-  }
-
-  render(renderer, inputBuffer) {
-    renderer.setRenderTarget(this.lowRes);
-    renderer.render(this.gameScene, this.gameCamera);
-    this.fullscreenMaterial.inputBuffer = this.lowRes.texture;
-    renderer.setRenderTarget(this.renderToScreen ? null : inputBuffer);
-    renderer.render(this.scene, this.camera);
-  }
-}
 
 // settings — общий объект настроек (его меняет панель G)
 export function createPipeline(renderer, scene, camera, settings, quality) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, quality.maxDpr));
   renderer.toneMapping = THREE.NoToneMapping; // тональную коррекцию делает конвейер
 
-  const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType });
-  const pixelPass = new PixelRenderPass(scene, camera, settings);
-  pixelPass.pixelRatio = renderer.getPixelRatio();
-  composer.addPass(pixelPass);
+  // HalfFloat — запас яркости сверх белого, чтобы свечение было «горячим»; multisampling — сглаживание краёв
+  const composer = new EffectComposer(renderer, { frameBufferType: THREE.HalfFloatType, multisampling: quality.msaa });
+  composer.addPass(new RenderPass(scene, camera));
+
+  // Затенения в углах и там, где предметы касаются земли (только на хорошем качестве)
+  let ao = null;
+  if (quality.ao) {
+    ao = new N8AOPostPass(scene, camera, window.innerWidth, window.innerHeight);
+    ao.configuration.distanceFalloff = 1;
+    ao.configuration.halfRes = true; // считать в половинном размере — в разы быстрее, почти не видно
+    ao.configuration.aoSamples = 8;    // меньше проб — быстрее
+    ao.configuration.denoiseSamples = 4;
+    composer.addPass(ao);
+  }
 
   const bloom = new BloomEffect({ mipmapBlur: true, luminanceSmoothing: 0.2 });
   const toneMapping = new ToneMappingEffect({ mode: ToneMappingMode.AGX });
@@ -74,7 +45,10 @@ export function createPipeline(renderer, scene, camera, settings, quality) {
     lut.blendMode.opacity.value = settings.lutStrength;
     vignette.darkness = settings.vignette;
     grain.blendMode.opacity.value = settings.grain;
-    pixelPass.updateLowResSize();
+    if (ao) {
+      ao.configuration.intensity = settings.aoIntensity;
+      ao.configuration.aoRadius = settings.aoRadius;
+    }
   }
   apply();
 
@@ -84,11 +58,38 @@ export function createPipeline(renderer, scene, camera, settings, quality) {
   resize();
   window.addEventListener('resize', resize);
 
+  // Сторож кадров: если кадр долгий — снижаем чёткость (не ниже 0.75), есть запас — возвращаем.
+  // Меряем реальное время между кадрами за 2 секунды.
+  let pixelRatio = renderer.getPixelRatio();
+  let frames = 0;
+  let windowStart = performance.now();
+  function watchdog(now) {
+    frames++;
+    const elapsed = now - windowStart;
+    if (elapsed < 2000) return;
+    const frameMs = elapsed / frames;
+    frames = 0;
+    windowStart = now;
+    if (document.hidden || frameMs > 500) return; // вкладка в фоне — не считается
+    let next = pixelRatio;
+    if (frameMs > 22) next = Math.max(0.75, pixelRatio - 0.25);          // медленнее ~45 кадров/с
+    else if (frameMs < 14) next = Math.min(quality.maxDpr, pixelRatio + 0.25); // быстрее ~70 кадров/с
+    if (next !== pixelRatio) {
+      pixelRatio = next;
+      renderer.setPixelRatio(pixelRatio);
+      resize();
+    }
+  }
+
   return {
     apply,
     lutNames: Object.keys(luts),
+    get pixelRatio() {
+      return pixelRatio;
+    },
     render(dt) {
       composer.render(dt);
+      watchdog(performance.now());
     },
   };
 }

@@ -1,7 +1,7 @@
 // Остров из плиток: ровная середина (огород, дорожка, домик), неровные края
 // с рваными обрывами снизу и парящие отколовшиеся плитки вокруг.
 import * as THREE from 'three';
-import { COLORS } from './config.js';
+import { getMaterial, projectUV } from './art/assets.js';
 
 const TILE = 0.5; // размер плитки острова
 
@@ -64,21 +64,40 @@ export function createIsland(scene, core) {
     }
   }
 
-  // Плитка: верх — цвет земли, бока — тёмный обрыв
-  const materials = (() => {
-    const side = new THREE.MeshLambertMaterial({ color: COLORS.cliff });
-    const top = new THREE.MeshLambertMaterial({ color: COLORS.ground });
-    return [side, side, top, side, side, side];
-  })();
+  // Земля: верх — трава, бока — обрыв. Все плитки сливаются в две цельные поверхности,
+  // разметка текстуры — в координатах мира, поэтому рисунок не повторяется плитка к плитке.
+  const grass = getMaterial('grass');
+  const cliff = getMaterial('cliff');
+  const topPos = [];
+  const topNor = [];
+  const sidePos = [];
+  const sideNor = [];
+  for (const t of tiles) {
+    const box = new THREE.BoxGeometry(TILE, t.depth, TILE).toNonIndexed();
+    box.translate(t.x, t.top - t.depth / 2, t.z);
+    const pos = box.attributes.position.array;
+    const nor = box.attributes.normal.array;
+    for (let i = 0; i < pos.length; i += 9) { // по треугольнику
+      const isTop = nor[i + 1] > 0.5;
+      (isTop ? topPos : sidePos).push(...pos.slice(i, i + 9));
+      (isTop ? topNor : sideNor).push(...nor.slice(i, i + 9));
+    }
+  }
+  const surface = (positions, normals, material) => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    projectUV(geo, material.userData.units);
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+  };
+  surface(topPos, topNor, grass);
+  surface(sidePos, sideNor, cliff);
+
+  const materials = [cliff, cliff, grass, cliff, cliff, cliff]; // для парящих плиток: грани x, x, верх, низ, z, z
   const geo = new THREE.BoxGeometry(1, 1, 1);
-  const ground = new THREE.InstancedMesh(geo, materials, tiles.length);
-  ground.receiveShadow = true;
-  const m = new THREE.Matrix4();
-  tiles.forEach((t, i) => {
-    m.compose(new THREE.Vector3(t.x, t.top - t.depth / 2, t.z), new THREE.Quaternion(), new THREE.Vector3(TILE, t.depth, TILE));
-    ground.setMatrixAt(i, m);
-  });
-  scene.add(ground);
+  projectUV(geo, 1);
 
   // Отколовшиеся плитки парят рядом с краем
   const flying = [];

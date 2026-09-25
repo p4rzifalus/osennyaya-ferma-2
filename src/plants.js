@@ -3,11 +3,21 @@
 import * as THREE from 'three';
 import { COLORS } from './config.js';
 import { glowMaterial } from './render/glow.js';
+import { mergeStatic } from './render/merge.js';
+
+// один материал на цвет — чтобы части растения склеивались
+const materials = new Map();
+function materialFor(color, glow) {
+  const key = `${color}|${glow}`;
+  if (!materials.has(key)) {
+    // «светится»: свет и тени на него не действуют
+    materials.set(key, glow ? glowMaterial(color, 0.45) : new THREE.MeshStandardMaterial({ color, roughness: 0.8 })); // грибы светятся мягко
+  }
+  return materials.get(key);
+}
 
 function mesh(geo, color, x = 0, y = 0, z = 0, glow = false) {
-  const material = glow
-    ? glowMaterial(color) // «светится»: свет и тени на него не действуют
-    : new THREE.MeshLambertMaterial({ color });
+  const material = materialFor(color, glow);
   const m = new THREE.Mesh(geo, material);
   m.position.set(x, y, z);
   m.castShadow = true;
@@ -117,6 +127,7 @@ export function buildPlant(type, stage) {
   g.add(mound());
   if (stage === 0) g.add(mesh(sphere(0.04), COLORS.seed, 0, 0.1, 0));
   else BUILDERS[type](stage, g);
+  mergeStatic(g); // растение — по куску на цвет
   return g;
 }
 

@@ -4,11 +4,28 @@ import { COLORS, GARDEN_SIZE, CELL_SIZE, BASKET_CELL, MIN_CELL_PX } from './conf
 import { cellToWorld } from './grid.js';
 import { createIsland } from './island.js';
 import { glowMaterial } from './render/glow.js';
+import { getMaterial, mapTextures } from './art/assets.js';
+import { mergeStatic } from './render/merge.js';
 
 const isTouch = window.matchMedia('(pointer: coarse)').matches;
 const TOOLBAR_SPACE = 160; // сколько точек снизу занимают панель инструментов и ряд семян
 
-const mat = (color) => new THREE.MeshLambertMaterial({ color });
+// Какой цвет каким материалом рисуется: стены — доски, крыша — черепица, дерево — с волокнами…
+// Остальные цвета — гладкий материал без текстуры.
+const wood = (color) => () => getMaterial('wood', { tint: color });
+const SURFACES = {
+  [COLORS.houseWalls]: () => getMaterial('planks'),
+  [COLORS.houseRoof]: () => getMaterial('roof'),
+  [COLORS.houseStep]: () => getMaterial('stone'),
+  [COLORS.basket]: () => getMaterial('wicker'),
+  [COLORS.houseTrim]: wood(COLORS.houseTrim),
+  [COLORS.houseDoor]: wood(COLORS.houseDoor),
+  [COLORS.houseShutters]: wood(COLORS.houseShutters),
+  [COLORS.barrel]: wood(COLORS.barrel),
+  [COLORS.logs]: wood(COLORS.logs),
+};
+const mat = (color) => SURFACES[color]?.() ?? new THREE.MeshStandardMaterial({ color, roughness: 0.85 });
+
 
 // Кубик с тенями, поставленный на пол (y — высота низа)
 function box(w, h, d, color, x = 0, y = 0, z = 0) {
@@ -33,15 +50,7 @@ export function createScene(container) {
   camera.position.set(20, 20, 20);
   camera.lookAt(0, 0, 0);
 
-  // Свет: мягкий общий + солнце с тенями
-  // небо светит голубоватым сверху, земля — тёплым снизу; солнце — тёплое, клонится к закату
-  scene.add(new THREE.HemisphereLight('#aabbee', '#5a4030', 1.3));
-  const sun = new THREE.DirectionalLight('#ffd2a0', 3.2);
-  sun.position.set(-4, 10, 6);
-  sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048);
-  Object.assign(sun.shadow.camera, { left: -10, right: 10, top: 10, bottom: -10, near: 0.5, far: 30 });
-  scene.add(sun);
+  // Свет — в render/lighting.js (вечер) и world/lanterns.js (фонари)
 
   // Размеры: огород + дорожка вокруг в одну клетку
   const half = (GARDEN_SIZE / 2 + 1) * CELL_SIZE;   // край дорожки
@@ -225,7 +234,7 @@ function createHouse(x, z) {
 
   // Конёк крыши и труба с шапкой
   house.add(box(0.14, 0.12, d + 0.4, COLORS.houseTrim, 0, h + 1.04, 0));
-  house.add(box(0.3, 0.7, 0.3, COLORS.houseRoof, 0.8, h + 0.35, -0.3));
+  house.add(box(0.3, 0.7, 0.3, COLORS.houseStep, 0.8, h + 0.35, -0.3)); // труба — каменная
   house.add(box(0.4, 0.08, 0.4, COLORS.houseTrim, 0.8, h + 1.03, -0.3));
 
   // Сбоку: бочка и поленница
@@ -247,6 +256,8 @@ function createHouse(x, z) {
     house.add(log);
   }
 
+  mapTextures(house);
+  mergeStatic(house); // ~70 деталей → по куску на материал
   house.position.set(x, 0, z);
   return house;
 }
@@ -274,6 +285,7 @@ function createBasket(x, z) {
   fill.visible = false;
   basket.add(fill);
   basket.userData.fill = fill;
+  mapTextures(basket);
   basket.position.set(x, 0, z);
   return basket;
 }

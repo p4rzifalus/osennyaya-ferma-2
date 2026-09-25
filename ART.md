@@ -1,0 +1,60 @@
+# ТЗ на графику
+
+## Что какое: правило разделения
+**Мир — реалистичный, всё живое и мелкое — пиксельное.**
+
+| Реалистичное (фото-текстуры, PBR) | Пиксельное (пиксель-арт, спрайты) |
+|---|---|
+| Поверхности 3D-мира: трава острова, обрывы, земля грядок, камень, доски стен, черепица, кора, листва кроны, дерево (рамы, бочка, поленья), плетёнка корзинки | Крот (все анимации), растения по стадиям, урожай в лапах, пучки травы и цветы, падающие листья и искры, иконки интерфейса |
+
+Реалистичные текстуры рисуются гладко (без пикселей) и получают рельеф и блики.
+Пиксельные спрайты рисуются чётко, целым масштабом (каждый пиксель рисунка = ровный квадрат на экране).
+Общего пиксельного фильтра на всю картинку больше нет.
+
+## Как сдавать файлы
+- Кладёшь PNG в папку `art/` в корне проекта с именем из таблицы — игра берёт его вместо сгенерированного.
+- Рельеф (карту нормалей) и шероховатость для реалистичных текстур игра **сделает сама из картинки**.
+  Если хочешь свои — `<имя>_n.png` (нормали) и `<имя>_r.png` (шероховатость).
+- Шов: если картинка получилась не совсем бесшовной, игра сама сгладит стык.
+- После добавления файла перезапусти сервер (`npm run dev`).
+
+## Реалистичные текстуры — задания для GPT Image
+Каждую текстуру — отдельным запросом. Формат ответа: **квадрат 1024×1024, PNG**.
+К каждому заданию добавляй общий хвост (ниже), он важен: вид строго сверху, ровный свет, без теней —
+иначе в игре свет «задвоится» (своё солнце + нарисованные тени).
+
+**Общий хвост (добавить в конец каждого задания):**
+> Seamless tileable texture, perfectly top-down orthographic view, flat even diffuse lighting, no shadows, no specular highlights, no perspective, no vignette, no text, no border. Uniform detail density across the whole square with no focal point, edges must tile seamlessly. Photorealistic, high detail, 1024x1024.
+
+| Файл | Задание (перед хвостом) |
+|---|---|
+| `grass.png` | Autumn meadow ground seen from directly above: short olive-green and yellowing grass, a few scattered fallen orange and red leaves, tiny dry twigs, small patches of dark soil showing through. |
+| `cliff.png` | Vertical cross-section of earth like a cliff face seen straight on: horizontal layers of brown soil and clay, embedded small grey pebbles, thin hanging roots, slightly moist. |
+| `soil.png` | Freshly tilled dark brown garden soil seen from directly above, soft parallel furrows, crumbly clumps, a few tiny pebbles, rich and slightly moist. |
+| `stone.png` | Weathered grey granite rock surface seen straight on, subtle cracks, speckles, small patches of pale green lichen. |
+| `planks.png` | Old weathered wooden wall of horizontal planks, warm light-brown pine, visible wood grain, knots, thin dark gaps between planks, planks about 10 cm tall. |
+| `roof.png` | Terracotta clay roof tiles seen straight on, rows of overlapping rounded tiles, warm red-orange, slightly weathered with subtle moss in the gaps. |
+| `bark.png` | Oak tree bark close-up seen straight on, deep vertical furrows, dark grey-brown. |
+| `leaves.png` | Dense autumn foliage seen straight on, overlapping maple and oak leaves in orange, red and golden yellow, filling the whole frame. |
+| `wood.png` | Plain weathered wood grain, planed boards, **neutral light grey color (desaturated)**, visible grain lines and a few knots. (Цвет каждой детали игра задаёт сама, поэтому серый.) |
+| `wicker.png` | Tight basket weave of natural willow wicker, light tan, seen straight on. |
+
+Сколько места в игре занимает одна картинка (повторяется дальше): трава, обрыв, доски, черепица — 4×4 клетки;
+земля, камень, кора, листва, дерево — 2×2 клетки; плетёнка — 1 клетка.
+
+## Фон — вечернее небо (`sky.png`)
+Картинка за островом, во весь экран. Главное — **приглушённая и мягкая**: остров освещён фонарями,
+фон не должен с ним спорить (никаких ярких пятен, резких переходов и насыщенных цветов).
+Игра сама растягивает её по экрану без искажений, лишнее обрезает по краям — поэтому важное не ставь к краям.
+
+- Формат: **квадрат 1536×1536**, PNG. Общий «хвост» для текстур сюда **не добавлять**.
+- Цвета, под которые подобрана сцена (сверху вниз): `#1e2236` → `#3a3450` → `#554457` → `#735a5a`.
+
+**Задание для GPT Image:**
+> Muted evening sky backdrop for a cozy video game. Soft painterly gradient from dusty slate blue at the top (#1e2236) through muted lavender (#3a3450, #554457) to faded warm rose-brown near the bottom (#735a5a). Very low contrast and low saturation, calm and hazy. Barely visible soft clouds in the middle, a few faint tiny stars only at the very top. No sun disc, no bright spots, no glow, no horizon line, no landscape, no trees, no buildings, no objects, no text, no border. Slight film grain. Looks like an out-of-focus background behind a brightly lit foreground. Square 1536x1536.
+
+Если выйдет слишком ярко или контрастно — добавь в конец: *even more muted, darker, flatter, less saturated*.
+
+## Пиксельные спрайты (этап 3)
+Рисуются руками в Aseprite или генерируются кодом. Размеры, порядок кадров и листы — допишу на этапе 3.
+Для GPT Image пиксель-арт не заказываем: он плохо держит ровную пиксельную сетку и одинаковые кадры анимации.

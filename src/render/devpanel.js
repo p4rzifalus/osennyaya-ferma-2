@@ -7,7 +7,7 @@ import { rememberQuality } from './quality.js';
 const STORAGE_KEY = 'ogorod2-fx';
 
 export function loadFxSettings(quality) {
-  const settings = { ...FX, pixelScale: quality.pixelScale };
+  const settings = { ...FX };
   try {
     Object.assign(settings, JSON.parse(localStorage.getItem(STORAGE_KEY)) || {});
   } catch { /* нет сохранённого — берём из config.js */ }
@@ -28,6 +28,8 @@ export function createDevPanel(settings, pipeline, quality) {
   const gui = new GUI({ title: 'Картинка (G — скрыть)' });
   const fps = { value: '—' };
   gui.add(fps, 'value').name('кадров в секунду').disable().listen();
+  const sharp = { value: '—' };
+  gui.add(sharp, 'value').name('чёткость (сторож)').disable().listen();
 
   const q = { level: quality.name };
   gui.add(q, 'level', Object.keys(QUALITY)).name('качество').onChange((name) => {
@@ -35,12 +37,14 @@ export function createDevPanel(settings, pipeline, quality) {
     location.reload(); // тени и разрешение меняются только с перезагрузкой
   });
 
-  gui.add(settings, 'pixelScale', 1, 6, 1).name('размер пикселя').onChange(changed);
-
   const glow = gui.addFolder('Свечение');
   glow.add(settings, 'bloomIntensity', 0, 4, 0.05).name('сила').onChange(changed);
   glow.add(settings, 'bloomThreshold', 0, 2, 0.01).name('порог яркости').onChange(changed);
   glow.add(settings, 'bloomRadius', 0, 1, 0.01).name('размах').onChange(changed);
+
+  const shade = gui.addFolder('Затенения в углах');
+  shade.add(settings, 'aoIntensity', 0, 6, 0.1).name('сила').onChange(changed);
+  shade.add(settings, 'aoRadius', 0.1, 4, 0.05).name('радиус').onChange(changed);
 
   const color = gui.addFolder('Цвет');
   color.add(settings, 'lut', pipeline.lutNames).name('цветокоррекция').onChange(changed);
@@ -78,6 +82,7 @@ export function createDevPanel(settings, pipeline, quality) {
       frames++;
       if (now - since >= 1000) {
         fps.value = String(Math.round((frames * 1000) / (now - since)));
+        sharp.value = `${pipeline.pixelRatio}×`;
         frames = 0;
         since = now;
       }

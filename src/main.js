@@ -10,11 +10,15 @@ import { createUI, TOOLS } from './ui.js';
 import { createDecor } from './decor.js';
 import { detectQuality } from './render/quality.js';
 import { createPipeline } from './render/pipeline.js';
+import { createLighting } from './render/lighting.js';
+import { createLanterns } from './world/lanterns.js';
 import { createDevPanel, loadFxSettings } from './render/devpanel.js';
 import { loadGame, saveGame, clearSave } from './save.js';
 
 const quality = detectQuality();
 const { renderer, scene, camera, cameraControl, world, basket, landmarks, island } = createScene(document.body);
+createLighting(renderer, scene, quality);
+const lanterns = createLanterns(scene, quality);
 const fx = loadFxSettings(quality);
 const pipeline = createPipeline(renderer, scene, camera, fx, quality);
 const devPanel = createDevPanel(fx, pipeline, quality);
@@ -142,6 +146,7 @@ renderer.setAnimationLoop((now) => {
   gardenView.update();
   decor.update(dt, now / 1000);
   island.update(now / 1000);
+  lanterns.update(now / 1000);
 
   placeOn(hoverFrame, input.hoverCell);
   placeOn(frontMarker, frontCell());
@@ -153,7 +158,7 @@ renderer.setAnimationLoop((now) => {
 // Только для разработки: доступ к игре из консоли браузера (game.restart() — начать заново)
 if (import.meta.env.DEV) {
   window.game = {
-    game, mole, camera, scene, restart, quality,
+    game, mole, camera, scene, restart, quality, pipeline, renderer,
     garden: game.garden,
     cheat(extraCoins = 1000) { game.addCoins(extraCoins); },
   };
