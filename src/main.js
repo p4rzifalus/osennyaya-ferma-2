@@ -29,6 +29,7 @@ let restarting = false; // во время «начать заново» не с
 const game = createGame({
   onHint: (text, ms) => ui.hint(text, ms),
   onEffect(name, cell) {
+    mole.playAction(); // крот наклоняется: сажает, поливает, собирает, кладёт в корзинку
     if (name === 'watered') decor.splash(cellToWorld(cell.x, cell.z));
   },
   onChange: refresh,

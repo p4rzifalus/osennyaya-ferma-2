@@ -8,6 +8,9 @@ import { FEATURES } from './island.js';
 import { getMaterial, mapTextures } from './art/assets.js';
 import { glowMaterial } from './render/glow.js';
 import { mergeStatic } from './render/merge.js';
+import { Sprite } from './render/sprites.js';
+import { getSheets } from './world/sheets.js';
+import { DECOR_FRAME } from './art/sprite-art.js';
 
 // Какой цвет каким материалом: кора, камень, дерево; остальное — гладкий материал
 const SURFACES = {
@@ -72,39 +75,19 @@ export function createDecor(scene, landmarks) {
     scene.add(stone);
   }
 
-  // Травинки и цветы качаются на ветру — у каждого свой «шарнир» у земли
+  // Травинки и цветы — пиксельные спрайты, качаются на ветру (наклон у основания)
+  const decorSheet = getSheets().decor;
   const swaying = [];
-  for (let i = 0; i < DECOR.grassTufts; i++) {
-    const tuft = new THREE.Group();
-    for (let b = 0; b < 3; b++) {
-      const h = between(0.22, 0.38);
-      const blade = new THREE.Mesh(new THREE.ConeGeometry(0.045, h, 4), lambert(COLORS.grass));
-      blade.position.set(between(-0.09, 0.09), h / 2, between(-0.09, 0.09));
-      blade.rotation.set(between(-0.3, 0.3), 0, between(-0.3, 0.3));
-      tuft.add(blade);
-    }
-    mergeStatic(tuft); // три травинки — одним куском
-    tuft.position.copy(takeSpot());
-    swaying.push({ object: tuft, phase: rand() * 6, amount: 0.25 });
-    scene.add(tuft);
-  }
-  for (let i = 0; i < DECOR.flowers; i++) {
-    const flower = new THREE.Group();
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.025, 0.36, 5), lambert(COLORS.grass));
-    stem.position.y = 0.18;
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), lambert(COLORS.flower));
-    head.position.y = 0.38;
-    head.scale.z = 0.6;
-    const center = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 4), lambert(COLORS.flowerCenter));
-    center.position.set(0, 0.38, 0.05);
-    flower.add(stem, head, center);
-    flower.position.copy(takeSpot());
-    flower.rotation.y = Math.PI / 4; // серединка смотрит к камере
-    swaying.push({ object: flower, phase: rand() * 6, amount: 0.15 });
-    scene.add(flower);
-  }
-  // травинки и цветы — без теней: их почти не видно, а считать дорого
-  for (const s of swaying) s.object.traverse((m) => { m.castShadow = false; });
+  const plantSprite = (col, position, amount) => {
+    const sprite = new Sprite(decorSheet, { castShadow: false }); // мелочь без теней: почти не видно, а считать дорого
+    sprite.setFrame(col, 0);
+    sprite.object.position.copy(position);
+    swaying.push({ mesh: sprite.mesh, phase: rand() * 6, amount });
+    scene.add(sprite.object);
+  };
+  const pick = (list) => list[Math.floor(rand() * list.length)];
+  for (let i = 0; i < DECOR.grassTufts; i++) plantSprite(pick(DECOR_FRAME.tufts), takeSpot(), 0.25);
+  for (let i = 0; i < DECOR.flowers; i++) plantSprite(pick(DECOR_FRAME.flowers), takeSpot(), 0.15);
 
   // Флюгер на коньке крыши: стрелка поворачивается по ветру
   const vane = new THREE.Group();
@@ -124,14 +107,12 @@ export function createDecor(scene, landmarks) {
   vane.traverse((m) => { m.castShadow = true; });
   scene.add(vane);
 
-  // Дым из трубы: круглые полупрозрачные клубы поднимаются, растут, сносятся ветром и тают
-  const puffGeo = new THREE.SphereGeometry(1, 12, 8);
-  const puffMat = new THREE.MeshLambertMaterial({ color: COLORS.smoke, transparent: true, opacity: DECOR.smokeOpacity, depthWrite: false });
+  // Дым из трубы: пиксельные клубы поднимаются, растут, сносятся ветром и рассыпаются
   const puffs = [];
   for (let i = 0; i < DECOR.smokePuffs; i++) {
-    const puff = new THREE.Mesh(puffGeo, puffMat);
-    puffs.push({ mesh: puff, age: i / DECOR.smokePuffs });
-    scene.add(puff);
+    const puff = new Sprite(getSheets().smoke, { castShadow: false });
+    puffs.push({ sprite: puff, age: i / DECOR.smokePuffs });
+    scene.add(puff.object);
   }
 
   // Пушинки летают над островом по ветру
@@ -139,13 +120,25 @@ export function createDecor(scene, landmarks) {
   // вечером пушинки — это светлячки: светятся и мерцают
   const fluffMat = glowMaterial(COLORS.firefly, 1.2);
   // все светлячки рисуются одной командой (InstancedMesh), у каждого своё место и мерцание
-  const fireflies = new THREE.InstancedMesh(fluffGeo, fluffMat, DECOR.fluffs);
+  const fireflies = new THREE.InstancedMesh(fluffGeo, fluffMat, DECOR.fireflies);
   scene.add(fireflies);
   const fireflyDummy = new THREE.Object3D();
+  // Светлячок живёт так: появляется в случайном месте над травой, несколько секунд кружит
+  // на одном месте, гаснет, отдыхает и появляется в другом месте
   const fluffs = [];
-  for (let i = 0; i < DECOR.fluffs; i++) {
-    const pos = new THREE.Vector3(between(island.minX, island.maxX), between(0.4, 1.8), between(island.minZ, island.maxZ));
-    fluffs.push({ pos, phase: rand() * 6, speed: between(0.6, 1.1) });
+  const newFireflySpot = (f) => {
+    f.center = new THREE.Vector3(between(island.minX + 0.5, island.maxX - 0.5), between(0.35, 1.1), between(island.minZ + 0.5, island.maxZ - 0.5));
+    f.life = between(5, 9);       // сколько светит
+    f.rest = between(2, 7);       // сколько отдыхает до следующего появления
+    f.age = 0;
+    f.radius = between(0.12, 0.3);
+    f.spin = between(1, 2.2) * (rand() < 0.5 ? -1 : 1);
+  };
+  for (let i = 0; i < DECOR.fireflies; i++) {
+    const f = { phase: rand() * 6 };
+    newFireflySpot(f);
+    f.age = -rand() * f.rest; // появляются не все сразу
+    fluffs.push(f);
   }
 
   // Булыжники
@@ -159,21 +152,12 @@ export function createDecor(scene, landmarks) {
     scene.add(boulder);
   }
 
-  // Высокая трава — пятнами, тоже качается на ветру
+  // Высокая трава — пятнами из нескольких спрайтов
   for (const patch of FEATURES.tallGrass) {
-    const clump = new THREE.Group(); // всё пятно травы — одним-двумя кусками, качается целиком
-    const count = 5 + Math.floor(rand() * 4);
+    const count = 3 + Math.floor(rand() * 3);
     for (let i = 0; i < count; i++) {
-      const h = between(0.4, 0.75);
-      const cone = new THREE.Mesh(new THREE.ConeGeometry(0.05, h, 4), lambert(rand() < 0.3 ? COLORS.leavesA : COLORS.tallGrass));
-      cone.position.set(between(-0.35, 0.35), h / 2, between(-0.35, 0.35));
-      cone.rotation.set(between(-0.15, 0.15), rand() * 3, between(-0.15, 0.15));
-      clump.add(cone);
+      plantSprite(pick(DECOR_FRAME.tall), new THREE.Vector3(patch.x + between(-0.35, 0.35), 0, patch.z + between(-0.35, 0.35)), 0.3);
     }
-    mergeStatic(clump);
-    clump.position.set(patch.x, 0, patch.z);
-    swaying.push({ object: clump, phase: rand() * 6, amount: 0.3 });
-    scene.add(clump);
   }
 
   // Дерево с осенней листвой и качелями на ветке
@@ -218,13 +202,14 @@ export function createDecor(scene, landmarks) {
   swingPivot.add(swing);
   tree.add(swingPivot);
 
-  // Листья падают с кроны, кружатся и появляются снова
+  // Листья: немного, ветер носит их по всему острову, они кувыркаются и покачиваются
   const leafGeo = new THREE.PlaneGeometry(0.13, 0.09);
-  const leafMat = new THREE.MeshBasicMaterial({ color: COLORS.leavesA, side: THREE.DoubleSide });
+  const leafMats = [COLORS.leavesA, COLORS.leavesB, '#e0a040'].map((color) => new THREE.MeshStandardMaterial({ color, side: THREE.DoubleSide, roughness: 0.9 }));
   const leaves = [];
-  for (let i = 0; i < DECOR.fallingLeaves; i++) {
-    const leaf = new THREE.Mesh(leafGeo, leafMat);
-    leaves.push({ mesh: leaf, age: rand(), phase: rand() * 6, offset: new THREE.Vector3(between(-0.9, 0.9), 0, between(-0.9, 0.9)) });
+  for (let i = 0; i < DECOR.leaves; i++) {
+    const leaf = new THREE.Mesh(leafGeo, leafMats[i % leafMats.length]);
+    leaf.position.set(between(island.minX, island.maxX), between(0.3, 2), between(island.minZ, island.maxZ));
+    leaves.push({ mesh: leaf, phase: rand() * 6, speed: between(0.6, 1.1) });
     scene.add(leaf);
   }
 
@@ -256,10 +241,11 @@ export function createDecor(scene, landmarks) {
       windStrength = DECOR.wind * (0.6 + 0.4 * Math.sin(time * 0.4) + 0.2 * Math.sin(time * 1.7));
       wind.set(Math.sin(angle), 0, Math.cos(angle));
 
+      // ветер «вправо по экрану» наклоняет спрайты вправо
+      const windRight = (wind.x - wind.z) * Math.SQRT1_2;
       for (const s of swaying) {
         const lean = windStrength * s.amount * (0.7 + 0.3 * Math.sin(time * 2.2 + s.phase));
-        s.object.rotation.x = wind.z * lean;
-        s.object.rotation.z = -wind.x * lean;
+        s.mesh.rotation.z = -windRight * lean;
       }
 
       // Флюгер смотрит по ветру, чуть подрагивает
@@ -268,23 +254,26 @@ export function createDecor(scene, landmarks) {
       for (const p of puffs) {
         p.age = (p.age + dt / 4) % 1; // клуб живёт 4 секунды
         const t = p.age;
-        p.mesh.position.copy(landmarks.chimneyTop)
-          .add(new THREE.Vector3(wind.x * windStrength * t * 1.2, t * 1.4, wind.z * windStrength * t * 1.2));
-        p.mesh.scale.setScalar(0.06 + Math.sin(Math.PI * t) * 0.16); // растёт, потом тает
+        p.sprite.object.position.copy(landmarks.chimneyTop)
+          .add(new THREE.Vector3(wind.x * windStrength * t * 1.2, t * 1.4 - 0.2, wind.z * windStrength * t * 1.2));
+        p.sprite.object.scale.setScalar(0.8 + t * 0.8);               // клуб растёт
+        p.sprite.setFrame(Math.min(3, Math.floor(t * 4)), 0);          // и рассыпается по кадрам
       }
 
       fluffs.forEach((f, i) => {
-        const p = f.pos;
-        p.addScaledVector(wind, windStrength * f.speed * 0.35 * dt); // светлячки летают медленно
-        p.y += Math.sin(time * 1.3 + f.phase) * 0.2 * dt;
-        const glow = 0.3 + 0.7 * Math.max(0, Math.sin(time * 2.2 + f.phase * 3)); // мерцание
-        // улетела за край острова — появляется с другой стороны
-        if (p.x > island.maxX) p.x = island.minX;
-        if (p.x < island.minX) p.x = island.maxX;
-        if (p.z > island.maxZ) p.z = island.minZ;
-        if (p.z < island.minZ) p.z = island.maxZ;
-        fireflyDummy.position.copy(p);
-        fireflyDummy.scale.setScalar(glow);
+        f.age += dt;
+        if (f.age > f.life + f.rest) newFireflySpot(f);
+        // плавно загорается и гаснет, в середине чуть мерцает
+        const lit = f.age > 0 && f.age < f.life ? Math.sin((Math.PI * f.age) / f.life) : 0;
+        const glow = lit * (0.75 + 0.25 * Math.sin(time * 6 + f.phase));
+        // кружит вокруг своей точки, покачиваясь вверх-вниз
+        const a = time * f.spin + f.phase;
+        fireflyDummy.position.set(
+          f.center.x + Math.cos(a) * f.radius,
+          f.center.y + Math.sin(time * 1.7 + f.phase) * 0.08,
+          f.center.z + Math.sin(a) * f.radius,
+        );
+        fireflyDummy.scale.setScalar(Math.max(glow, 0.001));
         fireflyDummy.updateMatrix();
         fireflies.setMatrixAt(i, fireflyDummy.matrix);
       });
@@ -294,14 +283,15 @@ export function createDecor(scene, landmarks) {
       swing.rotation.x = Math.sin(time * 1.6) * (0.12 + windStrength * 0.15);
 
       for (const l of leaves) {
-        l.age = (l.age + dt / 6) % 1; // лист падает 6 секунд
-        const fall = l.age;
-        l.mesh.position.set(
-          FEATURES.tree.x + l.offset.x + wind.x * windStrength * fall * 1.5 + Math.sin(time * 2 + l.phase) * 0.15,
-          2.4 - fall * 2.4,
-          FEATURES.tree.z + l.offset.z + wind.z * windStrength * fall * 1.5,
-        );
-        l.mesh.rotation.set(time * 2 + l.phase, time * 1.3 + l.phase, 0);
+        const p = l.mesh.position;
+        p.addScaledVector(wind, windStrength * l.speed * dt);
+        p.y += Math.sin(time * 1.1 + l.phase) * 0.25 * dt;
+        l.mesh.rotation.set(time * 2 + l.phase, time * 1.3 + l.phase, 0); // кувыркается
+        // улетел за край острова — прилетает с другой стороны
+        if (p.x > island.maxX + 1) p.x = island.minX - 1;
+        if (p.x < island.minX - 1) p.x = island.maxX + 1;
+        if (p.z > island.maxZ + 1) p.z = island.minZ - 1;
+        if (p.z < island.minZ - 1) p.z = island.maxZ + 1;
       }
 
       for (let i = drops.length - 1; i >= 0; i--) {

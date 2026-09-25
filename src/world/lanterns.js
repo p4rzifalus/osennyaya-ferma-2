@@ -24,35 +24,37 @@ function lanternLight(color, intensity, distance, castShadow, quality) {
   return light;
 }
 
-// Конус света под фонарём: мягкий прозрачный «луч» в вечернем воздухе.
-// Обычный предмет со светлой прозрачной текстурой — без дополнительных проходов.
-let coneTexture = null;
+// Конус света под фонарём: мягкое свечение в вечернем воздухе.
+// Яркость спадает к земле и к краям конуса (края «размыты»), поэтому это не форма, а дымка света.
+// Обычный предмет со своим простым шейдером — без дополнительных проходов.
+const coneMaterial = () => new THREE.ShaderMaterial({
+  uniforms: { uColor: { value: new THREE.Color(LIGHTING.lanternColor).multiplyScalar(LIGHTING.coneStrength) } },
+  vertexShader: /* glsl */ `
+    varying vec3 vNormalView;
+    varying float vHeight;
+    void main() {
+      vNormalView = normalize(normalMatrix * normal);
+      vHeight = uv.y; // 1 — у фонаря, 0 — у земли
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: /* glsl */ `
+    uniform vec3 uColor;
+    varying vec3 vNormalView;
+    varying float vHeight;
+    void main() {
+      float facing = abs(vNormalView.z);          // к нам «лицом» — середина конуса, «ребром» — края
+      float soft = pow(max(facing, 1e-4), 2.5);    // края тают (max — защита от «не-числа» на некоторых видеокартах)
+      float fall = pow(max(vHeight, 1e-4), 1.8);   // к земле свет слабеет
+      gl_FragColor = vec4(uColor * soft * fall, 1.0);
+    }`,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  side: THREE.DoubleSide,
+});
+
 function lightCone(height, radius) {
-  if (!coneTexture) { // яркий у фонаря, тает к земле
-    const canvas = document.createElement('canvas');
-    canvas.width = 4;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-    const g = ctx.createLinearGradient(0, 0, 0, 64);
-    g.addColorStop(0, 'rgba(255,255,255,1)');
-    g.addColorStop(0.5, 'rgba(255,255,255,0.35)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 4, 64);
-    coneTexture = new THREE.CanvasTexture(canvas);
-  }
-  const cone = new THREE.Mesh(
-    new THREE.ConeGeometry(radius, height, 24, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: new THREE.Color(LIGHTING.lanternColor).multiplyScalar(LIGHTING.coneStrength),
-      alphaMap: coneTexture,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      side: THREE.DoubleSide,
-      fog: false,
-    }),
-  );
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(radius, height, 24, 1, true), coneMaterial());
   cone.position.y = -height / 2; // вершина — у фонаря
   cone.castShadow = false;
   cone.renderOrder = 2;

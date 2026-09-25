@@ -1,73 +1,27 @@
-// Крот-огородник: собран из простых фигур, ходит сам или по маршруту.
+// Крот-огородник: пиксельный спрайт с анимациями, ходит сам или по маршруту.
 import * as THREE from 'three';
-import { buildHeld } from './plants.js';
-import { COLORS, CELL_SIZE, MOLE_SPEED, MOLE_TURN_SPEED, MOLE_SCALE, MOLE_REACH } from './config.js';
+import { CELL_SIZE, MOLE_SPEED, MOLE_TURN_SPEED, MOLE_SCALE, MOLE_REACH } from './config.js';
+import { Sprite } from './render/sprites.js';
+import { getSheets } from './world/sheets.js';
+import { MOLE, PLANT_ORDER } from './art/sprite-art.js';
 
 const RADIUS = 0.3 * MOLE_SCALE; // «толщина» крота для столкновений
+const FPS = { idle: 3, walk: 10, act: 10, carry: 10 }; // скорость анимаций, кадров в секунду
+const ACT_TIME = MOLE.anims.act[1] / FPS.act;         // сколько длится «действие»
 
-function part(geo, color, x, y, z, scale) {
-  const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color }));
-  m.position.set(x, y, z);
-  if (scale) m.scale.set(...scale);
-  m.castShadow = true;
-  return m;
+// Куда крот смотрит относительно камеры → строка листа.
+// Камера смотрит по диагонали, поэтому «к зрителю» — это угол 45°.
+function directionOf(heading) {
+  const rel = Math.atan2(Math.sin(heading - Math.PI / 4), Math.cos(heading - Math.PI / 4));
+  if (Math.abs(rel) <= Math.PI / 4) return 'down';
+  if (Math.abs(rel) >= (3 * Math.PI) / 4) return 'up';
+  return rel > 0 ? 'right' : 'left';
 }
 
-// Собираем крота. Стоит на двух лапах, смотрит вдоль +z.
-function buildMole() {
-  const body = new THREE.Group();
-  const sphere = (r) => new THREE.SphereGeometry(r, 16, 12);
-  const cyl = (r1, r2, h) => new THREE.CylinderGeometry(r1, r2, h, 12);
-
-  // Туловище-груша и штаны на лямках
-  body.add(part(sphere(0.24), COLORS.moleBody, 0, 0.44, 0, [1, 1.25, 0.9]));
-  body.add(part(cyl(0.235, 0.25, 0.2), COLORS.moleOveralls, 0, 0.3, 0));
-  for (const side of [-1, 1]) {
-    const strap = part(new THREE.BoxGeometry(0.05, 0.3, 0.03), COLORS.moleOveralls, side * 0.1, 0.5, 0.185);
-    strap.rotation.x = -0.3;
-    body.add(strap);
-  }
-
-  // Голова: мордочка, нос, глазки
-  body.add(part(sphere(0.19), COLORS.moleBody, 0, 0.8, 0));
-  body.add(part(sphere(0.09), COLORS.moleSnout, 0, 0.76, 0.18, [1, 0.85, 1.4]));
-  body.add(part(sphere(0.045), COLORS.moleNose, 0, 0.78, 0.31));
-  for (const side of [-1, 1]) body.add(part(sphere(0.025), COLORS.moleEyes, side * 0.08, 0.86, 0.15));
-
-  // Ноги и руки крепятся на «шарнирах», чтобы ими можно было махать при ходьбе
-  const legs = [];
-  const arms = [];
-  for (const side of [-1, 1]) {
-    const leg = new THREE.Group();
-    leg.position.set(side * 0.1, 0.2, 0);
-    leg.add(part(cyl(0.065, 0.06, 0.16), COLORS.moleBody, 0, -0.08, 0));
-    leg.add(part(sphere(0.07), COLORS.molePaws, 0, -0.17, 0.04, [1, 0.5, 1.4])); // ступня
-    body.add(leg);
-    legs.push(leg);
-
-    const arm = new THREE.Group();
-    arm.position.set(side * 0.24, 0.56, 0);
-    arm.rotation.z = side * 0.25; // руки чуть разведены
-    arm.add(part(cyl(0.05, 0.045, 0.2), COLORS.moleBody, 0, -0.1, 0));
-    arm.add(part(sphere(0.08), COLORS.molePaws, 0, -0.23, 0.02, [1.1, 0.8, 0.5])); // широкая ладонь-лопатка
-    body.add(arm);
-    arms.push(arm);
-  }
-
-  // Соломенная шляпа, чуть сдвинута на затылок
-  const hat = new THREE.Group();
-  hat.add(part(cyl(0.3, 0.3, 0.03), COLORS.moleHat, 0, 0, 0));           // поля
-  hat.add(part(cyl(0.14, 0.17, 0.16), COLORS.moleHat, 0, 0.1, 0));       // тулья
-  hat.add(part(cyl(0.175, 0.175, 0.05), COLORS.moleHatBand, 0, 0.04, 0)); // лента
-  hat.position.set(0, 0.95, -0.04);
-  hat.rotation.x = -0.2;
-  body.add(hat);
-
-  const root = new THREE.Group();
-  root.add(body);
-  body.scale.setScalar(MOLE_SCALE);
-  return { root, body, legs, arms };
-}
+// Где урожай в лапах: перед кротом, а если он смотрит от нас — за ним
+const HELD_OFFSET = {
+  down: [0, 0.2, 0.03], left: [-0.22, 0.2, 0.03], right: [0.22, 0.2, 0.03], up: [0, 0.22, -0.03],
+};
 
 // Поворот на кратчайший угол
 function turnTowards(current, target, maxStep) {
@@ -78,11 +32,15 @@ function turnTowards(current, target, maxStep) {
 
 export class Mole {
   constructor() {
-    const { root, body, legs, arms } = buildMole();
-    this.object = root;
-    this.body = body;
-    this.legs = legs;
-    this.arms = arms;
+    const sheets = getSheets();
+    this.sprite = new Sprite(sheets.mole);
+    this.heldSprite = new Sprite(sheets.held);
+    this.object = new THREE.Group();
+    this.object.add(this.sprite.object);
+    this.sprite.object.add(this.heldSprite.mesh); // урожай — в той же «повёрнутой к камере» плоскости
+    this.object.scale.setScalar(MOLE_SCALE);
+    this.actTime = 0;         // сколько ещё показывать «действие»
+    this.animTime = 0;
     this.heading = 0;        // куда смотрит сейчас (угол)
     this.targetHeading = 0;  // куда хочет повернуться
     this.walkTime = 0;
@@ -90,19 +48,19 @@ export class Mole {
     this.faceTo = null;      // куда повернуться в конце маршрута
     this.onArrive = null;
     this.held = null;        // что в лапах (например, 'carrot')
-    this.heldObject = null;
   }
 
   // Взять урожай в лапы (или освободить лапы, если type = null)
   setHeld(type) {
-    if (this.heldObject) this.body.remove(this.heldObject);
     this.held = type;
-    this.heldObject = null;
-    if (type) {
-      this.heldObject = buildHeld(type);
-      this.heldObject.position.set(0, 0.42, 0.34);
-      this.body.add(this.heldObject);
-    }
+    this.heldSprite.mesh.visible = !!type;
+    if (type) this.heldSprite.setFrame(PLANT_ORDER.indexOf(type), 0);
+  }
+
+  // Показать короткое движение «сажаю / поливаю / собираю»
+  playAction() {
+    this.actTime = ACT_TIME;
+    this.animTime = 0;
   }
 
   get position() {
@@ -149,21 +107,32 @@ export class Mole {
     }
 
     this.heading = turnTowards(this.heading, this.targetHeading, MOLE_TURN_SPEED * dt);
-    this.object.rotation.y = this.heading;
 
-    // Шаги: ноги по очереди, руки машут навстречу, тело чуть подпрыгивает
-    if (moving) this.walkTime += dt;
-    else this.walkTime = 0;
-    const swing = moving ? Math.sin(this.walkTime * 12) : 0;
-    this.legs[0].rotation.x = swing * 0.6;
-    this.legs[1].rotation.x = -swing * 0.6;
-    // С урожаем лапы вытянуты вперёд и держат его, без размахивания
-    const armBase = this.held ? -1.25 : 0;
-    const armSwing = this.held ? 0.08 : 0.5;
-    this.arms[0].rotation.x = armBase - swing * armSwing;
-    this.arms[1].rotation.x = armBase + swing * armSwing;
-    this.body.position.y = Math.abs(swing) * 0.03;
-    this.body.rotation.z = swing * 0.04;
+    // Какую анимацию показать и какой кадр
+    let anim = 'idle';
+    if (this.actTime > 0) {
+      anim = 'act';
+      this.actTime -= dt;
+    } else if (moving) {
+      anim = this.held ? 'carry' : 'walk';
+    } else if (this.held) {
+      anim = 'carry'; // стоит с урожаем — первый кадр «несёт»
+    }
+    if (anim !== this.anim) {
+      this.anim = anim;
+      this.animTime = 0;
+    }
+    this.animTime += dt;
+    const [first, count] = MOLE.anims[anim];
+    const still = anim === 'carry' && !moving;
+    const frame = still ? 0 : Math.floor(this.animTime * FPS[anim]) % count;
+    const dir = directionOf(this.heading);
+    this.sprite.setFrame(first + frame, MOLE.dirs[dir]);
+
+    // урожай в лапах покачивается вместе с шагом
+    const [hx, hy, hz] = HELD_OFFSET[dir];
+    const bob = moving && frame % 3 === 0 ? -0.03 : 0;
+    this.heldSprite.mesh.position.set(hx, hy + bob, hz);
   }
 
   arrive() {

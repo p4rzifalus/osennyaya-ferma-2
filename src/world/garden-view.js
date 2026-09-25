@@ -4,7 +4,9 @@ import { GARDEN_SIZE, CELL_SIZE } from '../config.js';
 import { getMaterial, projectUV } from '../art/assets.js';
 import { cellToWorld } from '../grid.js';
 import { EMPTY, RIPE } from '../garden.js';
-import { buildPlant } from '../plants.js';
+import { Sprite } from '../render/sprites.js';
+import { getSheets } from './sheets.js';
+import { PLANT_ORDER } from '../art/sprite-art.js';
 
 export class GardenView {
   constructor(scene, garden) {
@@ -25,11 +27,12 @@ export class GardenView {
         tile.receiveShadow = true;
         scene.add(tile);
 
-        const anchor = new THREE.Group(); // сюда ставим растение
-        anchor.position.set(p.x, 0.04, p.z);
-        scene.add(anchor);
+        const plant = new Sprite(getSheets().plants); // растение — пиксельный спрайт
+        plant.object.position.set(p.x, 0.04, p.z);
+        plant.object.visible = false;
+        scene.add(plant.object);
 
-        this.cells.push({ x, z, tile, anchor, shownStage: null });
+        this.cells.push({ x, z, tile, plant, shownStage: null, shownType: null });
       }
     }
   }
@@ -39,10 +42,11 @@ export class GardenView {
     for (const view of this.cells) {
       const cell = this.garden.cell(view);
       const stage = this.garden.stage(view, now);
-      if (stage !== view.shownStage) {
-        view.anchor.clear();
-        if (stage !== EMPTY) view.anchor.add(buildPlant(cell.plant, stage));
+      if (stage !== view.shownStage || cell.plant !== view.shownType) {
+        view.plant.object.visible = stage !== EMPTY;
+        if (stage !== EMPTY) view.plant.setFrame(stage, PLANT_ORDER.indexOf(cell.plant));
         view.shownStage = stage;
+        view.shownType = cell.plant;
       }
 
       // Земля: тёмная, пока растёт после полива; светлая, когда урожай готов

@@ -107,6 +107,7 @@ export function createLighting(renderer, scene, quality, islandBounds) {
   sun.castShadow = true;
   sun.shadow.mapSize.set(quality.shadowMap, quality.shadowMap);
   sun.shadow.bias = -0.0005;
+  sun.shadow.intensity = LIGHTING.shadowStrength; // длинные закатные тени — полупрозрачные
   sun.shadow.normalBias = 0.03;
   Object.assign(sun.shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach, near: 1, far: 50 });
   scene.add(sun);

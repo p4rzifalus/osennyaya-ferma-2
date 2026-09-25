@@ -37,7 +37,7 @@ uniform float uFadeDepth;
 uniform float uFadeStrength;`)
       .replace('#include <opaque_fragment>', `
   // отсвет неба на краях
-  float skyRim = pow( 1.0 - saturate( dot( normal, geometryViewDir ) ), 3.0 );
+  float skyRim = pow( max( 1.0 - saturate( dot( normal, geometryViewDir ) ), 1e-4 ), 3.0 );
   outgoingLight += uSkyRim * uSkyRimStrength * skyRim;
   // низ острова растворяется в дымке
   float skyFade = smoothstep( 0.0, uFadeDepth, -vSkyWorldY ) * uFadeStrength;
