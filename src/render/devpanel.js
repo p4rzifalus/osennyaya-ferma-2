@@ -15,7 +15,7 @@ export function loadFxSettings(quality) {
   return settings;
 }
 
-export function createDevPanel(settings, pipeline, quality, weather) {
+export function createDevPanel(settings, pipeline, quality, weather, audio) {
   const save = () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -62,6 +62,26 @@ export function createDevPanel(settings, pipeline, quality, weather) {
     const sky = gui.addFolder('Погода');
     sky.add({ rain: () => weather.setRain(true) }, 'rain').name('дождь сейчас');
     sky.add({ clear: () => weather.setRain(false) }, 'clear').name('ясно');
+  }
+
+  if (audio) {
+    // Громкости не запоминаются: подобрал — «скопировать громкости» и впиши в config.js → SOUND
+    const vol = gui.addFolder('Звук');
+    const apply = () => audio.applyVolumes();
+    vol.add(audio.volumes, 'master', 0, 1, 0.05).name('общая').onChange(apply);
+    vol.add(audio.volumes, 'effects', 0, 1, 0.05).name('действия').onChange(apply);
+    vol.add(audio.volumes, 'ambience', 0, 1, 0.05).name('природа').onChange(apply);
+    vol.add(audio.volumes, 'music', 0, 1, 0.05).name('музыка').onChange(apply);
+    vol.add(audio.volumes, 'steps', 0, 1, 0.05).name('шаги');
+    vol.add(audio.volumes, 'wind', 0, 1, 0.05).name('ветер');
+    vol.add(audio.volumes, 'tempo', 40, 100, 1).name('темп мелодии');
+    vol.add({
+      copy() {
+        const text = JSON.stringify(audio.volumes, null, 2);
+        navigator.clipboard?.writeText(text);
+        console.log(text);
+      },
+    }, 'copy').name('скопировать громкости');
   }
 
   gui.add({

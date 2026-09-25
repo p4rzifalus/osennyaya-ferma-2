@@ -79,6 +79,7 @@ export function createWeather(scene, quality, lighting, islandCore) {
   return {
     get raining() { return raining; },
     get wetness() { return wetness; },
+    get intensity() { return intensity; }, // сила дождя сейчас 0..1 (для звука)
     setRain(on) {
       raining = on;
       timer = rand(...(on ? WEATHER.rainMinutes : WEATHER.clearMinutes)) * 60;

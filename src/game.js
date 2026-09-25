@@ -81,6 +81,7 @@ export function createGame({ onHint, onEffect, onChange }) {
     onEffect('sold', BASKET_CELL);
 
     const opened = lockedBefore.filter(isUnlocked);
+    if (opened.length) onEffect('unlocked', BASKET_CELL);
     if (opened.length) onHint(`Новые семена в магазине: ${opened.map((t) => PLANTS[t].name).join(', ')}!`, 3500);
     else onHint(`+${PLANTS[type].sellPrice} мон.`);
   }

@@ -1,6 +1,6 @@
 // Точка входа: собираем правила игры (game.js), картинку и управление, запускаем игровой цикл.
 import * as THREE from 'three';
-import { MOLE_START, BASKET_CELL } from './config.js';
+import { MOLE_START, BASKET_CELL, PLANTS } from './config.js';
 import { cellToWorld, worldToCell, isInGarden, findPathToNeighbor } from './grid.js';
 import { createGame, isBasket } from './game.js';
 import { RIPE } from './garden.js';
@@ -20,6 +20,7 @@ import { createLanterns } from './world/lanterns.js';
 import { applySkyReflex } from './render/sky-reflex.js';
 import { createDevPanel, loadFxSettings } from './render/devpanel.js';
 import { loadGame, saveGame, clearSave } from './save.js';
+import { createSound } from './audio/index.js';
 
 const quality = detectQuality();
 setTextureLimit(quality.textureSize); // на слабом качестве картинки уменьшаются при загрузке
@@ -31,13 +32,22 @@ const weather = createWeather(scene, quality, lighting, landmarks.island);
 const fx = loadFxSettings(quality);
 const pipeline = createPipeline(renderer, scene, camera, fx, quality);
 // Панель настройки (G) — только при разработке; в опубликованной игре её нет
-const devPanel = import.meta.env.DEV ? createDevPanel(fx, pipeline, quality, weather) : null;
+const sound = createSound();
+const devPanel = import.meta.env.DEV ? createDevPanel(fx, pipeline, quality, weather, sound.engine) : null;
 
 // ---------- Правила ----------
 let restarting = false; // во время «начать заново» не сохраняем
+let effectJustPlayed = false; // подсказка сразу после действия («+2 мон.») — не ошибка, «нельзя» не звучит
 const game = createGame({
-  onHint: (text, ms) => ui.hint(text, ms),
+  onHint(text, ms) {
+    if (!effectJustPlayed) sound.deny();
+    ui.hint(text, ms);
+  },
   onEffect(name, cell) {
+    effectJustPlayed = true;
+    queueMicrotask(() => { effectJustPlayed = false; });
+    if (name === 'unlocked') return sound.unlocked();
+    sound[name](name === 'sold' ? PLANTS[mole.held]?.sellPrice : undefined); // урожай ещё в лапах — по нему считаем монетки
     mole.playAction(); // крот наклоняется: сажает, поливает, собирает, кладёт в корзинку
     const at = cellToWorld(cell.x, cell.z);
     if (name === 'planted') effects.dirt(at);
@@ -61,11 +71,29 @@ const hoverFrame = createHoverFrame();
 const frontMarker = createFrontMarker();
 scene.add(hoverFrame, frontMarker);
 
+// Действия интерфейса — со звуком
+function selectTool(id) {
+  if (id !== game.state.tool) sound.click();
+  game.selectTool(id);
+}
+function toggleShop(open = !game.state.shopOpen) {
+  if (open !== game.state.shopOpen) sound.shop(open);
+  game.toggleShop(open);
+}
+
 const ui = createUI({
-  onSelectTool: (id) => game.selectTool(id),
-  onSelectSeed: (type) => game.selectSeed(type),
-  onBuy: (type, count) => game.buySeeds(type, count),
-  onShopToggle: (open) => game.toggleShop(open),
+  onSelectTool: selectTool,
+  onSelectSeed(type) {
+    sound.click();
+    game.selectSeed(type);
+  },
+  onBuy(type, count) {
+    const coins = game.state.coins;
+    game.buySeeds(type, count);
+    if (game.state.coins < coins) sound.buy();
+  },
+  onShopToggle: toggleShop,
+  sound: sound.engine,
 });
 
 // Загрузка сохранения. Растения «досчитываются» сами: стадия считается от момента полива.
@@ -132,13 +160,15 @@ const input = createInput(renderer.domElement, camera, {
     cameraControl.panBy(dx, dy);
   },
   onTool(n) {
-    if (n === 4) game.toggleShop();
-    else if (TOOLS[n - 1]) game.selectTool(TOOLS[n - 1].id);
+    if (n === 4) toggleShop();
+    else if (TOOLS[n - 1]) selectTool(TOOLS[n - 1].id);
   },
 }, [{ object: basket, cell: BASKET_CELL }]);
 
 window.addEventListener('keydown', (e) => {
-  if (e.code === 'Escape' && game.state.shopOpen) game.toggleShop(false);
+  if (e.code === 'Escape' && game.state.shopOpen) toggleShop(false);
+  if (e.code === 'KeyM') sound.engine.toggle('music');   // M — музыка
+  if (e.code === 'KeyN') sound.engine.toggle('effects'); // N — звуки
 });
 
 // ---------- Игровой цикл ----------
@@ -177,6 +207,12 @@ renderer.setAnimationLoop((now) => {
   decor.fireflyVisibility = 1 - weather.wetness; // в дождь светлячки прячутся
   effects.update(dt, { ripeMushrooms: ripeMushrooms(), visibility: 1 - weather.wetness });
   island.update(now / 1000);
+  sound.update(dt, {
+    molePosition: mole.position,
+    onSoil: isInGarden(worldToCell(mole.position)),
+    windStrength: decor.windStrength,
+    rain: weather.intensity,
+  });
   lanterns.update(now / 1000);
 
   placeOn(hoverFrame, input.hoverCell);
@@ -189,7 +225,7 @@ renderer.setAnimationLoop((now) => {
 // Только для разработки: доступ к игре из консоли браузера (game.restart() — начать заново)
 if (import.meta.env.DEV) {
   window.game = {
-    game, mole, camera, scene, restart, quality, pipeline, renderer, weather, effects, decor, cameraControl,
+    game, mole, camera, scene, restart, sound, quality, pipeline, renderer, weather, effects, decor, cameraControl,
     // крупный план: game.closeUp(x, y, z, ширина) ; game.closeUp() — вернуть обычный вид
     closeUp(x, y, z, size) { cameraControl.closeUp(x === undefined ? null : new THREE.Vector3(x, y, z), size); },
     garden: game.garden,

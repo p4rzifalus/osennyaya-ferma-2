@@ -52,7 +52,7 @@
       canvas { touch-action: none; } /* палец двигает сцену, а не страницу */
 
       /* Общая «стеклянная» панель: полупрозрачная, размывает то, что за ней */
-      .toolbar button, .seed-row button, .shop, .hud, .hint {
+      .toolbar button, .seed-row button, .shop, .hud, .hint, .sound-bar button {
         background: var(--glass);
         border: 1px solid var(--edge);
         border-radius: 12px;
@@ -134,6 +134,25 @@
         opacity: 0; transition: opacity 0.3s; pointer-events: none;
       }
       .hint.visible { opacity: 1; }
+
+      /* Звук и музыка — в левом верхнем углу */
+      .sound-bar { position: fixed; top: 12px; left: 12px; display: flex; gap: 8px; }
+      .sound-bar button {
+        position: relative; width: 52px; height: 52px; padding: 0;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--amber); cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+        transition: color 0.15s, opacity 0.15s;
+      }
+      .sound-bar button:hover { color: var(--text); }
+      .sound-bar .pixel-icon { width: 30px; height: 30px; fill: currentColor; }
+      .sound-bar .key { position: absolute; top: 3px; left: 6px; font-size: 9px; color: var(--text-dim); }
+      .sound-bar button.off { color: var(--text-dim); opacity: 0.7; }
+      /* выключено — косая черта поперёк значка */
+      .sound-bar button.off::after {
+        content: ''; position: absolute; left: 11px; right: 11px; top: 50%; height: 3px;
+        background: currentColor; transform: rotate(-45deg);
+      }
+      @media (pointer: coarse) { .sound-bar .key { display: none; } } /* на телефоне клавиш нет */
 
     </style>
   </head>

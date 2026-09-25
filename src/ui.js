@@ -58,6 +58,36 @@ const PIXEL_ICONS = {
     '############',
     '............',
   ],
+  // звук: динамик с волнами
+  sound: [
+    '............',
+    '.....#......',
+    '....##...#..',
+    '...###.#..#.',
+    '######..#.#.',
+    '######..#.#.',
+    '######..#.#.',
+    '######..#.#.',
+    '...###.#..#.',
+    '....##...#..',
+    '.....#......',
+    '............',
+  ],
+  // музыка: две ноты
+  music: [
+    '............',
+    '....#######.',
+    '....#######.',
+    '....#.....#.',
+    '....#.....#.',
+    '....#.....#.',
+    '....#.....#.',
+    '..###...###.',
+    '.####..####.',
+    '.####..####.',
+    '..##....##..',
+    '............',
+  ],
 };
 
 // Рисуем значок квадратиками без сглаживания, цвет берётся у кнопки
@@ -98,7 +128,31 @@ function formatTime(seconds) {
   return `${String(Math.round((seconds / 60) * 10) / 10).replace('.', ',')} мин`;
 }
 
-export function createUI({ onSelectTool, onSelectSeed, onBuy, onShopToggle }) {
+export function createUI({ onSelectTool, onSelectSeed, onBuy, onShopToggle, sound }) {
+  // Кнопки звука и музыки в левом верхнем углу (клавиши N и M). Выключенная — перечёркнута и тусклее.
+  const soundBar = el('div', 'sound-bar');
+  const soundButtons = [
+    ['effects', 'sound', 'N', 'Звуки'],
+    ['music', 'music', 'M', 'Музыка'],
+  ].map(([name, icon, key, label]) => {
+    const b = el('button', '', `${pixelIcon(icon)}<span class="key">${key}</span>`);
+    b.addEventListener('click', () => sound.toggle(name));
+    soundBar.appendChild(b);
+    return { name, b, label };
+  });
+  const showSound = () => {
+    for (const { name, b, label } of soundButtons) {
+      const on = sound.isOn(name);
+      b.classList.toggle('off', !on);
+      b.title = `${label}: ${on ? 'вкл' : 'выкл'}`;
+      b.setAttribute('aria-label', b.title);
+      b.setAttribute('aria-pressed', String(on));
+    }
+  };
+  sound.onChange(showSound);
+  showSound();
+  document.body.appendChild(soundBar);
+
   // Панель инструментов
   const toolbar = el('div', 'toolbar');
   const toolButtons = {};
