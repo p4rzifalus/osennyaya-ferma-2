@@ -152,6 +152,13 @@
         content: ''; position: absolute; left: 11px; right: 11px; top: 50%; height: 3px;
         background: currentColor; transform: rotate(-45deg);
       }
+      /* кнопки камеры — второй ряд под звуком; включённая лупа светится, как выбранный инструмент */
+      .view-bar { top: 72px; }
+      .view-bar button { color: var(--text-dim); }
+      .view-bar button.on {
+        color: var(--amber); background: var(--glass-strong); border-color: var(--amber);
+        box-shadow: 0 0 18px var(--amber-soft), 0 6px 24px rgba(0, 0, 0, 0.35);
+      }
       @media (pointer: coarse) { .sound-bar .key { display: none; } } /* на телефоне клавиш нет */
 
     </style>

@@ -13,11 +13,11 @@ const MOVE_KEYS = {
 export function createInput(canvas, camera, handlers = {}, pickables = []) {
   const pressed = new Set();
 
-  // «Вверх» на клавиатуре = вверх по экрану. Переводим направления экрана в направления на земле.
+  // «Вверх» на клавиатуре = вверх по экрану. Переводим направления экрана в направления на земле
+  // (считаем каждый раз заново: мир можно повернуть).
   const screenUp = new THREE.Vector3();
-  camera.getWorldDirection(screenUp);
-  screenUp.setY(0).normalize();
-  const screenRight = new THREE.Vector3().crossVectors(screenUp, new THREE.Vector3(0, 1, 0));
+  const screenRight = new THREE.Vector3();
+  const worldUp = new THREE.Vector3(0, 1, 0);
 
   window.addEventListener('keydown', (e) => {
     if (MOVE_KEYS[e.code]) {
@@ -57,6 +57,9 @@ export function createInput(canvas, camera, handlers = {}, pickables = []) {
 
     // Направление ходьбы с клавиатуры (нулевой вектор, если ничего не нажато)
     getMoveDir() {
+      camera.getWorldDirection(screenUp);
+      screenUp.setY(0).normalize();
+      screenRight.crossVectors(screenUp, worldUp);
       const dir = new THREE.Vector3();
       if (pressed.has('up')) dir.add(screenUp);
       if (pressed.has('down')) dir.sub(screenUp);

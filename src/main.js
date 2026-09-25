@@ -81,6 +81,18 @@ function toggleShop(open = !game.state.shopOpen) {
   game.toggleShop(open);
 }
 
+// Камера: крупный план крота и поворот мира по 90°
+function toggleCloseUp(on) {
+  sound.click();
+  cameraControl.toggleCloseUp(on);
+  refresh();
+}
+function rotateWorld(step) {
+  sound.click();
+  cameraControl.rotate(step, mole.position);
+  refresh();
+}
+
 const ui = createUI({
   onSelectTool: selectTool,
   onSelectSeed(type) {
@@ -93,6 +105,8 @@ const ui = createUI({
     if (game.state.coins < coins) sound.buy();
   },
   onShopToggle: toggleShop,
+  onCloseUp: toggleCloseUp,
+  onRotate: rotateWorld,
   sound: sound.engine,
 });
 
@@ -106,6 +120,10 @@ if (saved) {
     mole.collide(world); // на случай, если огород поменялся
   }
 }
+if (saved?.view) {
+  cameraControl.setTurn(saved.view.turn || 0, mole.position);
+  cameraControl.toggleCloseUp(!!saved.view.closeUp);
+}
 cameraControl.centerOn(mole.position); // на телефоне сцена ближе — начинаем с крота
 refresh();
 
@@ -113,14 +131,15 @@ refresh();
 function refresh() {
   if (mole.held !== game.state.held) mole.setHeld(game.state.held);
   basket.userData.fill.visible = game.hasHarvest();
-  ui.render(game.view());
+  ui.render({ ...game.view(), closeUp: cameraControl.isCloseUp });
   save();
 }
 
 // ---------- Сохранение ----------
 function save() {
   if (restarting) return;
-  saveGame({ ...game.toSave(), mole: { x: mole.position.x, z: mole.position.z, heading: mole.heading } });
+  saveGame({ ...game.toSave(), mole: { x: mole.position.x, z: mole.position.z, heading: mole.heading },
+    view: { turn: cameraControl.turn, closeUp: cameraControl.isCloseUp } });
 }
 
 function restart() {
@@ -169,6 +188,10 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'Escape' && game.state.shopOpen) toggleShop(false);
   if (e.code === 'KeyM') sound.engine.toggle('music');   // M — музыка
   if (e.code === 'KeyN') sound.engine.toggle('effects'); // N — звуки
+  if (e.repeat) return;
+  if (e.code === 'KeyZ') toggleCloseUp();                 // Z — крупный план
+  if (e.code === 'KeyQ') rotateWorld(-1);                 // Q / E — повернуть мир
+  if (e.code === 'KeyE') rotateWorld(1);
 });
 
 // ---------- Игровой цикл ----------

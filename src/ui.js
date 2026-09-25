@@ -88,7 +88,39 @@ const PIXEL_ICONS = {
     '..##....##..',
     '............',
   ],
+  // лупа — крупный план
+  zoom: [
+    '............',
+    '...####.....',
+    '..#....#....',
+    '.#..##..#...',
+    '.#.####.#...',
+    '.#.####.#...',
+    '.#..##..#...',
+    '..#....#....',
+    '...####.#...',
+    '........##..',
+    '.........##.',
+    '..........##',
+  ],
+  // круговая стрелка по часовой — повернуть мир вправо
+  rotateRight: [
+    '............',
+    '....####....',
+    '..##....#...',
+    '.#.......#..',
+    '.#.....#####',
+    '.#......###.',
+    '.#.......#..',
+    '.#..........',
+    '..#.........',
+    '...##.......',
+    '.....###....',
+    '............',
+  ],
 };
+// против часовой — то же зеркально
+PIXEL_ICONS.rotateLeft = PIXEL_ICONS.rotateRight.map((row) => [...row].reverse().join(''));
 
 // Рисуем значок квадратиками без сглаживания, цвет берётся у кнопки
 function pixelIcon(name) {
@@ -128,7 +160,7 @@ function formatTime(seconds) {
   return `${String(Math.round((seconds / 60) * 10) / 10).replace('.', ',')} мин`;
 }
 
-export function createUI({ onSelectTool, onSelectSeed, onBuy, onShopToggle, sound }) {
+export function createUI({ onSelectTool, onSelectSeed, onBuy, onShopToggle, onCloseUp, onRotate, sound }) {
   // Кнопки звука и музыки в левом верхнем углу (клавиши N и M). Выключенная — перечёркнута и тусклее.
   const soundBar = el('div', 'sound-bar');
   const soundButtons = [
@@ -152,6 +184,21 @@ export function createUI({ onSelectTool, onSelectSeed, onBuy, onShopToggle, soun
   sound.onChange(showSound);
   showSound();
   document.body.appendChild(soundBar);
+
+  // Кнопки камеры под ними: повернуть мир влево (Q), крупный план (Z), повернуть вправо (E)
+  const viewBar = el('div', 'sound-bar view-bar');
+  const viewButton = (icon, key, label, onClick) => {
+    const b = el('button', '', `${pixelIcon(icon)}<span class="key">${key}</span>`);
+    b.title = label;
+    b.setAttribute('aria-label', label);
+    b.addEventListener('click', onClick);
+    viewBar.appendChild(b);
+    return b;
+  };
+  viewButton('rotateLeft', 'Q', 'Повернуть мир влево', () => onRotate(-1));
+  const closeUpButton = viewButton('zoom', 'Z', 'Крупный план', () => onCloseUp());
+  viewButton('rotateRight', 'E', 'Повернуть мир вправо', () => onRotate(1));
+  document.body.appendChild(viewBar);
 
   // Панель инструментов
   const toolbar = el('div', 'toolbar');
@@ -198,6 +245,8 @@ export function createUI({ onSelectTool, onSelectSeed, onBuy, onShopToggle, soun
     render(view) {
       for (const [id, b] of Object.entries(toolButtons)) b.classList.toggle('selected', id === view.tool);
       shopButton.classList.toggle('selected', view.shopOpen);
+      closeUpButton.classList.toggle('on', !!view.closeUp);
+      closeUpButton.setAttribute('aria-pressed', String(!!view.closeUp));
       coinsBox.textContent = `Монеты: ${view.coins}`;
 
       seedRow.classList.toggle('visible', view.tool === 'seeds');

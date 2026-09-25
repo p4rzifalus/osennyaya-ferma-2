@@ -9,6 +9,7 @@ import { getMaterial, mapTextures } from './art/assets.js';
 import { glowMaterial } from './render/glow.js';
 import { mergeStatic } from './render/merge.js';
 import { Sprite } from './render/sprites.js';
+import { viewAngle } from './render/view-angle.js';
 import { getSheets } from './world/sheets.js';
 import { DECOR_FRAME } from './art/sprite-art.js';
 
@@ -234,7 +235,7 @@ export function createDecor(scene, landmarks) {
       wind.set(Math.sin(angle), 0, Math.cos(angle));
 
       // ветер «вправо по экрану» наклоняет спрайты вправо
-      const windRight = (wind.x - wind.z) * Math.SQRT1_2;
+      const windRight = wind.x * Math.cos(viewAngle.yaw) - wind.z * Math.sin(viewAngle.yaw);
       for (const s of swaying) {
         const lean = windStrength * s.amount * (0.7 + 0.3 * Math.sin(time * 2.2 + s.phase));
         s.mesh.rotation.z = -windRight * lean;

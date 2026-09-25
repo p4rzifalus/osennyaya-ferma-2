@@ -4,9 +4,9 @@ import * as THREE from 'three';
 import { GLOW } from '../config.js';
 import { spriteNormalCanvas } from '../art/pixels.js';
 import { userArtUrl } from '../art/assets.js';
+import { registerSprite } from './view-angle.js';
 
 export const PX = 1 / 30;             // размер одного пикселя спрайта в мире (≈30 пикселей на клетку)
-const CAMERA_YAW = Math.PI / 4;       // камера смотрит по диагонали — спрайты повёрнуты так же
 
 function pixelTexture(canvas, colorSpace) {
   const tex = new THREE.CanvasTexture(canvas);
@@ -67,7 +67,7 @@ export class Sprite {
     this.mesh.customDistanceMaterial = sheet.distanceMaterial;
     this.mesh.castShadow = castShadow;
     this.object = new THREE.Group(); // двигаем этот объект; внутри он всегда повёрнут к камере
-    this.object.rotation.y = CAMERA_YAW;
+    registerSprite(this.object); // повёрнут к камере, поворачивается вместе с ней
     this.object.add(this.mesh);
     this.col = -1;
     this.row = -1;

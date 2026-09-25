@@ -2,8 +2,8 @@
 // все частицы одного вида рисуются одной командой видеокарте (InstancedMesh).
 // Квадратики повёрнуты к камере — в пиксельном стиле это «пиксели» разного размера.
 import * as THREE from 'three';
+import { viewAngle } from './view-angle.js';
 
-const CAMERA_YAW = Math.PI / 4;
 const GRAVITY = 6;
 const dummy = new THREE.Object3D();
 const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
@@ -52,7 +52,7 @@ export class ParticlePool {
         return;
       }
       dummy.position.copy(p.pos);
-      dummy.rotation.set(0, CAMERA_YAW, p.spin * p.age);
+      dummy.rotation.set(0, viewAngle.yaw, p.spin * p.age);
       dummy.scale.setScalar(Math.max(0.001, p.size * shape(p, p.age / p.life)));
       dummy.updateMatrix();
       this.mesh.setMatrixAt(i, dummy.matrix);

@@ -4,15 +4,16 @@ import { CELL_SIZE, MOLE_SPEED, MOLE_TURN_SPEED, MOLE_SCALE, MOLE_REACH } from '
 import { Sprite } from './render/sprites.js';
 import { getSheets } from './world/sheets.js';
 import { MOLE, PLANT_ORDER } from './art/sprite-art.js';
+import { viewAngle } from './render/view-angle.js';
 
 const RADIUS = 0.3 * MOLE_SCALE; // «толщина» крота для столкновений
 const FPS = { idle: 3, walk: 10, act: 10, carry: 10 }; // скорость анимаций, кадров в секунду
 const ACT_TIME = MOLE.anims.act[1] / FPS.act;         // сколько длится «действие»
 
 // Куда крот смотрит относительно камеры → строка листа.
-// Камера смотрит по диагонали, поэтому «к зрителю» — это угол 45°.
+// «К зрителю» — это угол, под которым стоит камера (сначала 45°, после поворота мира — другой).
 function directionOf(heading) {
-  const rel = Math.atan2(Math.sin(heading - Math.PI / 4), Math.cos(heading - Math.PI / 4));
+  const rel = Math.atan2(Math.sin(heading - viewAngle.yaw), Math.cos(heading - viewAngle.yaw));
   if (Math.abs(rel) <= Math.PI / 4) return 'down';
   if (Math.abs(rel) >= (3 * Math.PI) / 4) return 'up';
   return rel > 0 ? 'right' : 'left';

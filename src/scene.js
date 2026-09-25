@@ -6,6 +6,7 @@ import { createIsland } from './island.js';
 import { glowMaterial } from './render/glow.js';
 import { getMaterial, mapTextures } from './art/assets.js';
 import { mergeStatic } from './render/merge.js';
+import { setViewYaw } from './render/view-angle.js';
 
 const isTouch = window.matchMedia('(pointer: coarse)').matches;
 const TOOLBAR_SPACE = 160; // сколько точек снизу занимают панель инструментов и ряд семян
@@ -45,10 +46,19 @@ export function createScene(container) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(COLORS.background);
 
-  // Изометрическая камера: смотрит по диагонали сверху, без перспективы
+  // Изометрическая камера: смотрит по диагонали сверху, без перспективы.
+  // Её можно повернуть вокруг острова на 90° (4 положения) — см. cameraControl.rotate.
   const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
-  camera.position.set(20, 20, 20);
-  camera.lookAt(0, 0, 0);
+  const CAMERA_HEIGHT = 20;
+  const CAMERA_DISTANCE = 20 * Math.SQRT2; // по земле от центра — как у точки (20, 20, 20)
+  function placeCamera(yaw) {
+    camera.position.set(Math.sin(yaw) * CAMERA_DISTANCE, CAMERA_HEIGHT, Math.cos(yaw) * CAMERA_DISTANCE);
+    camera.lookAt(0, 0, 0);
+    camera.updateMatrixWorld();
+    setViewYaw(yaw); // спрайты разворачиваются к камере
+  }
+  const yawOf = (turn) => Math.PI / 4 + (turn * Math.PI) / 2; // turn — 0…3, сколько раз повернули мир
+  placeCamera(yawOf(0));
 
   // Свет — в render/lighting.js (вечер) и world/lanterns.js (фонари)
 
@@ -79,22 +89,37 @@ export function createScene(container) {
     new THREE.Vector3(core.minX - 1, -0.6, core.minZ - 1),
     new THREE.Vector3(core.maxX + 1, 3.3, core.maxZ + 1),
   );
-  camera.updateMatrixWorld();
-  // Границы сцены в координатах экрана камеры (камера не вращается, считаем один раз)
+  // Границы сцены в координатах экрана камеры — пересчитываем после каждого поворота
   const sceneRect = new THREE.Box3();
-  for (const x of [sceneBox.min.x, sceneBox.max.x])
-    for (const y of [sceneBox.min.y, sceneBox.max.y])
-      for (const z of [sceneBox.min.z, sceneBox.max.z])
-        sceneRect.expandByPoint(new THREE.Vector3(x, y, z).applyMatrix4(camera.matrixWorldInverse));
-  sceneRect.expandByScalar(0.4); // поля
+  function measureScene() {
+    sceneRect.makeEmpty();
+    for (const x of [sceneBox.min.x, sceneBox.max.x])
+      for (const y of [sceneBox.min.y, sceneBox.max.y])
+        for (const z of [sceneBox.min.z, sceneBox.max.z])
+          sceneRect.expandByPoint(new THREE.Vector3(x, y, z).applyMatrix4(camera.matrixWorldInverse));
+    sceneRect.expandByScalar(0.4); // поля
+  }
+  measureScene();
   const CELL_WIDTH_IN_VIEW = CELL_SIZE * Math.SQRT2; // ширина ромбика клетки
 
   const view = { scale: 1, center: sceneRect.getCenter(new THREE.Vector3()) }; // scale — точек экрана на единицу сцены
+  const toView = (worldPos) => worldPos.clone().applyMatrix4(camera.matrixWorldInverse); // точка сцены → координаты экрана камеры
+
+  // Крупный план: zoom плавно идёт от 1 к CAMERA.closeUpZoom и обратно
+  let closeUp = false;
+  let zoom = 1;
+  const scaleNow = () => view.scale * zoom;
+
+  // Поворот мира: turn — куда повернули (0…3), yaw — угол камеры сейчас (во время поворота — между точками)
+  let turn = 0;
+  let yaw = yawOf(0);
+  let targetYaw = yaw; // куда поворачиваемся (всегда ровно одна из 4 точек)
+  let turning = null; // { from, to, t, focus } — идёт поворот; focus — точка земли, которая остаётся в центре экрана
 
   // Держим видимую область в пределах сцены
   function clampCenter() {
-    const halfW = window.innerWidth / 2 / view.scale;
-    const halfH = freeHeight() / 2 / view.scale;
+    const halfW = window.innerWidth / 2 / scaleNow();
+    const halfH = freeHeight() / 2 / scaleNow();
     const clampAxis = (value, min, max, half) => (max - min <= half * 2 ? (min + max) / 2 : Math.min(max - half, Math.max(min + half, value)));
     view.center.x = clampAxis(view.center.x, sceneRect.min.x, sceneRect.max.x, halfW);
     view.center.y = clampAxis(view.center.y, sceneRect.min.y, sceneRect.max.y, halfH);
@@ -110,9 +135,9 @@ export function createScene(container) {
     clampCenter();
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const scale = debugView ? debugView.scale : view.scale;
-    const cx = (debugView ? debugView.x : view.center.x) + breath.x;
-    const cy = (debugView ? debugView.y : view.center.y) + breath.y;
+    const scale = debugView ? debugView.scale : scaleNow();
+    const cx = (debugView ? debugView.x : view.center.x) + breath.x / zoom;
+    const cy = (debugView ? debugView.y : view.center.y) + breath.y / zoom;
     const halfW = w / 2 / scale;
     const top = cy + freeHeight() / 2 / scale;
     Object.assign(camera, {
@@ -122,37 +147,84 @@ export function createScene(container) {
     camera.updateProjectionMatrix();
   }
 
-  function resize() {
-    const w = window.innerWidth;
-    renderer.setSize(w, window.innerHeight);
+  // Масштаб «вся сцена на экране»
+  function wholeSceneScale() {
     const size = sceneRect.getSize(new THREE.Vector3());
-    const fitScale = Math.min(w / size.x, freeHeight() / size.y);
-    // Приближаем только на сенсорных экранах: мышью и в мелкую клетку попасть легко
-    view.scale = isTouch ? Math.max(fitScale, MIN_CELL_PX / CELL_WIDTH_IN_VIEW) : fitScale;
+    return Math.min(window.innerWidth / size.x, freeHeight() / size.y);
+  }
+  // Обычный масштаб: на телефоне — не мельче пальца
+  // (приближаем только на сенсорных экранах: мышью и в мелкую клетку попасть легко)
+  function fitScale() {
+    const fit = wholeSceneScale();
+    return isTouch ? Math.max(fit, MIN_CELL_PX / CELL_WIDTH_IN_VIEW) : fit;
+  }
+
+  function resize() {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    view.scale = fitScale();
     applyView();
   }
   resize();
   window.addEventListener('resize', resize);
 
+  // Точка земли в центре экрана (чтобы при повороте она осталась на месте)
+  function groundAtCenter() {
+    const ray = new THREE.Ray(
+      new THREE.Vector3(view.center.x, view.center.y, 0).applyMatrix4(camera.matrixWorld),
+      camera.getWorldDirection(new THREE.Vector3()),
+    );
+    return ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3()) ?? new THREE.Vector3();
+  }
+
+  // Поставить камеру под угол a, сохранив точку focus в центре экрана
+  function setYaw(a, focus) {
+    yaw = a;
+    placeCamera(a);
+    measureScene();
+    view.scale = fitScale();
+    const p = toView(focus);
+    view.center.set(p.x, p.y, 0);
+  }
+
   let lastPan = -Infinity; // когда игрок последний раз двигал сцену пальцем
 
   const cameraControl = {
-    // Сдвинуть сцену вслед за пальцем (в точках экрана)
+    // Сдвинуть сцену вслед за пальцем (в точках экрана). В крупном плане камера держит крота — не двигаем.
     panBy(dxPx, dyPx) {
+      if (closeUp) return;
       view.center.x -= dxPx / view.scale;
       view.center.y += dyPx / view.scale;
       lastPan = performance.now();
       applyView();
     },
 
-    // Каждый кадр: лёгкое покачивание камеры; на телефоне — мягко догнать крота, если он ушёл к краю
+    // Каждый кадр: поворот и приближение; лёгкое покачивание камеры;
+    // в крупном плане — держим крота в центре; на телефоне — мягко догнать крота, если он ушёл к краю
     update(dt, time, followPos) {
+      if (turning) {
+        turning.t = Math.min(1, turning.t + (CAMERA.rotateTime > 0 ? dt / CAMERA.rotateTime : 1));
+        const e = turning.t * turning.t * (3 - 2 * turning.t); // мягкий старт и остановка
+        setYaw(turning.from + (turning.to - turning.from) * e, turning.focus);
+        if (turning.t >= 1) turning = null;
+      }
+
+      // Крупный план — от вида «вся сцена», поэтому на телефоне (где и так ближе) крот того же размера
+      const zoomTarget = closeUp ? Math.max(1.25, (wholeSceneScale() * CAMERA.closeUpZoom) / view.scale) : 1;
+      zoom += (zoomTarget - zoom) * Math.min(1, dt * 6);
+      if (Math.abs(zoomTarget - zoom) < 0.001) zoom = zoomTarget;
+
       breath.set(Math.sin(time * 0.37) * CAMERA.breath, Math.sin(time * 0.23 + 1) * CAMERA.breath * 0.6);
-      const canFollow = isTouch && CAMERA.followOnPhone && followPos && performance.now() - lastPan > 3000;
+      if (closeUp && followPos && !turning) {
+        const p = toView(followPos.clone().setY(followPos.y + 0.3)); // центр — на уровне груди крота
+        const k = Math.min(1, dt * 5);
+        view.center.x += (p.x - view.center.x) * k;
+        view.center.y += (p.y - view.center.y) * k;
+      }
+      const canFollow = !closeUp && isTouch && CAMERA.followOnPhone && followPos && performance.now() - lastPan > 3000;
       if (canFollow) {
-        const p = followPos.clone().applyMatrix4(camera.matrixWorldInverse);
-        const halfW = (window.innerWidth / 2 / view.scale) * 0.55; // «спокойная зона» — середина экрана
-        const halfH = (freeHeight() / 2 / view.scale) * 0.55;
+        const p = toView(followPos);
+        const halfW = (window.innerWidth / 2 / scaleNow()) * 0.55; // «спокойная зона» — середина экрана
+        const halfH = (freeHeight() / 2 / scaleNow()) * 0.55;
         const dx = p.x - view.center.x;
         const dy = p.y - view.center.y;
         const k = Math.min(1, dt * 2.5);
@@ -162,16 +234,39 @@ export function createScene(container) {
       applyView();
     },
 
+    // Повернуть мир на 90°: +1 — по часовой стрелке, −1 — против. focusPos — что держать в центре (крот)
+    rotate(step, focusPos) {
+      turn = (turn + step + 4) % 4;
+      targetYaw += step * (Math.PI / 2); // камера идёт вокруг острова — мир на экране крутится по часовой
+      const focus = turning?.focus ?? (closeUp && focusPos ? focusPos.clone().setY(0) : groundAtCenter());
+      turning = { from: yaw, to: targetYaw, t: 0, focus };
+    },
+    // Сразу поставить нужный поворот (при загрузке сохранения)
+    setTurn(n, focusPos) {
+      turn = ((n % 4) + 4) % 4;
+      turning = null;
+      targetYaw = yawOf(turn);
+      setYaw(targetYaw, focusPos ?? groundAtCenter());
+      applyView();
+    },
+    get turn() { return turn; },
+
+    // Крупный план крота: вкл/выкл (или задать явно)
+    toggleCloseUp(on = !closeUp) {
+      closeUp = on;
+    },
+    get isCloseUp() { return closeUp; },
+
     // Только для разработки: крупный план точки сцены (size — сколько единиц по ширине экрана); null — вернуть
     closeUp(worldPos, size = 6) {
       if (!worldPos) { debugView = null; applyView(); return; }
-      const p = worldPos.clone().applyMatrix4(camera.matrixWorldInverse);
+      const p = toView(worldPos);
       debugView = { x: p.x, y: p.y - freeHeight() / 2 / (window.innerWidth / size) + window.innerHeight / 2 / (window.innerWidth / size), scale: window.innerWidth / size };
       applyView();
     },
     // Поставить точку сцены в центр экрана
     centerOn(worldPos) {
-      const p = worldPos.clone().applyMatrix4(camera.matrixWorldInverse);
+      const p = toView(worldPos);
       view.center.set(p.x, p.y, 0);
       applyView();
     },
