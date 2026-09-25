@@ -48,6 +48,12 @@ function buildLUT(name, fn) {
 
 export function createLUTs() {
   return {
+    // Вечер: под наше небо — тени в сиреневый, света в янтарный, чуть приглушённый цвет
+    evening: buildLUT('evening', grade({
+      shadows: [0.5, 0.45, 0.62], shadowAmount: 0.45,
+      highlights: [0.64, 0.53, 0.4], highlightAmount: 0.35,
+      saturation: 1.05, contrast: 1.06, lift: 0.03,
+    })),
     // Осень: тёплые золотые света, чуть сиреневые тени, сочнее цвет
     autumn: buildLUT('autumn', grade({
       shadows: [0.46, 0.44, 0.58], shadowAmount: 0.35,

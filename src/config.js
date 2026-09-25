@@ -135,12 +135,17 @@ export const LIGHTING = {
   // приглушённый: без резких переходов, чтобы не спорил с освещённым островом.
   // Если в art/ есть sky.png — вместо градиента фоном будет картинка (ТЗ в ART.md)
   sky: [[0, '#1e2236'], [0.5, '#3a3450'], [0.8, '#554457'], [1, '#735a5a']],
-  environmentIntensity: 0.5,       // насколько блестящее отражает небо
+  environmentIntensity: 0.6,       // насколько блестящее отражает небо
+  skyReflex: 0.6,                  // отсвет неба на краях предметов (0 — нет)
+  bottomFade: 0.85,                // насколько низ острова растворяется в дымке (0 — нет, 1 — полностью)
+  // тёплый ореол за островом (в долях экрана): будто свет фонарей рассеивается в воздухе
+  halo: { color: '#ffb070', strength: 0.22, x: 0.5, y: 0.5, radius: 0.45 },
   fogColor: '#3a3450', fogNear: 32, fogFar: 80, // дымка вдали
   skyLight: '#6a78b8', groundColor: '#3a2618', skyLightIntensity: 1.2, // рассеянный свет неба
   sunColor: '#ff7a3a', sunIntensity: 3,
   sunDirection: { azimuth: -70, elevation: 12 }, // откуда светит солнце (в градусах): низко — длинные тени
   lanternColor: '#ffb45a', lanternIntensity: 16, lanternDistance: 6, // фонари
+  coneStrength: 0.05,              // яркость конусов света под фонарями (0 — нет)
 };
 
 // Где стоят фонари (координаты сцены)
@@ -154,16 +159,17 @@ export const LANTERNS = {
 
 // Реалистичные текстуры (картинки из art/): сколько клеток покрывает одна картинка и сила рельефа
 export const REALISTIC = {
-  grass:  { units: 4, relief: 3 },
-  cliff:  { units: 4, relief: 4 },
-  soil:   { units: 2, relief: 4 },
-  stone:  { units: 2, relief: 3 },
-  planks: { units: 3, relief: 4 },
-  roof:   { units: 2, relief: 4 },
-  bark:   { units: 2, relief: 4 },
-  leaves: { units: 2, relief: 3 },
-  wood:   { units: 2, relief: 3 },
-  wicker: { units: 1, relief: 4 },
+  // roughness — шероховатость: 1 — совсем матово, меньше — появляются блики от фонарей и отражение неба
+  grass:  { units: 4, relief: 3, roughness: 1 },
+  cliff:  { units: 4, relief: 4, roughness: 1 },
+  soil:   { units: 2, relief: 4, roughness: 0.95 },
+  stone:  { units: 2, relief: 3, roughness: 0.8 },
+  planks: { units: 3, relief: 4, roughness: 0.9 },
+  roof:   { units: 2, relief: 4, roughness: 0.65 },
+  bark:   { units: 2, relief: 4, roughness: 1 },
+  leaves: { units: 2, relief: 3, roughness: 0.85 },
+  wood:   { units: 2, relief: 3, roughness: 0.85 },
+  wicker: { units: 1, relief: 4, roughness: 0.9 },
 };
 
 // Сила свечения светящихся предметов (фонарь, окна, гриб): больше 1 — «горячее» белого, ловит bloom
@@ -174,7 +180,7 @@ export const FX = {
   bloomIntensity: 1.2,  // сила свечения
   bloomThreshold: 0.9,  // с какой яркости начинает светиться
   bloomRadius: 0.7,     // как широко расходится свечение
-  lut: 'sunset',        // цветокоррекция: autumn, sunset, dusk, neutral
+  lut: 'evening',       // цветокоррекция: evening, autumn, sunset, dusk, neutral
   lutStrength: 1,
   vignette: 0.5,        // затемнение по краям
   grain: 0.12,          // плёночное зерно

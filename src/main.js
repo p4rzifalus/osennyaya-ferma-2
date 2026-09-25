@@ -12,12 +12,13 @@ import { detectQuality } from './render/quality.js';
 import { createPipeline } from './render/pipeline.js';
 import { createLighting } from './render/lighting.js';
 import { createLanterns } from './world/lanterns.js';
+import { applySkyReflex } from './render/sky-reflex.js';
 import { createDevPanel, loadFxSettings } from './render/devpanel.js';
 import { loadGame, saveGame, clearSave } from './save.js';
 
 const quality = detectQuality();
 const { renderer, scene, camera, cameraControl, world, basket, landmarks, island } = createScene(document.body);
-createLighting(renderer, scene, quality);
+createLighting(renderer, scene, quality, landmarks.island); // тени — только над ровной серединой острова
 const lanterns = createLanterns(scene, quality);
 const fx = loadFxSettings(quality);
 const pipeline = createPipeline(renderer, scene, camera, fx, quality);
@@ -137,8 +138,13 @@ function placeOn(object, cell) {
   }
 }
 
+// Отсвет неба и растворение в дымке — всем материалам (и новым, например растениям) раз в секунду
+applySkyReflex(scene);
+let frameCount = 0;
+
 let last = performance.now();
 renderer.setAnimationLoop((now) => {
+  if (++frameCount % 60 === 0) applySkyReflex(scene);
   const dt = Math.min((now - last) / 1000, 0.05); // не больше 1/20 с, чтобы не «прыгал» после паузы
   last = now;
 

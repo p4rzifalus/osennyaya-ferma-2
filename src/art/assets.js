@@ -5,9 +5,9 @@ import * as THREE from 'three';
 import { TEXTURES, generateTexture, normalFromHeight, roughnessPixels } from './generate.js';
 import { REALISTIC } from '../config.js';
 
-// Все PNG из папки art/ (Vite находит их сам при запуске)
-const userArt = import.meta.glob('../../art/*.png', { eager: true, query: '?url', import: 'default' });
-const userFile = (name) => userArt[`../../art/${name}.png`];
+// Все картинки из папки art/ (Vite находит их сам при запуске): PNG, JPG или WebP
+const userArt = import.meta.glob('../../art/*.{png,jpg,jpeg,webp}', { eager: true, query: '?url', import: 'default' });
+const userFile = (name) => ['png', 'jpg', 'jpeg', 'webp'].map((ext) => userArt[`../../art/${name}.${ext}`]).find(Boolean);
 export const userArtUrl = userFile; // адрес твоей картинки из art/ (или undefined)
 
 function pixelTexture(pixels, size, colorSpace) {
@@ -85,6 +85,9 @@ function smoothSettings(tex, colorSpace) {
   return tex;
 }
 
+// Шероховатость реалистичного материала: из config.js (черепица и мокрое — глаже, трава и кора — матовые)
+const realisticRoughness = (name) => REALISTIC[name]?.roughness ?? 1;
+
 // Подставить реалистичную картинку: цвет из файла, рельеф и шероховатость — из неё же (если нет своих _n/_r)
 function loadRealistic(material, name, strength) {
   const loader = new THREE.TextureLoader();
@@ -95,6 +98,7 @@ function loadRealistic(material, name, strength) {
     material.aoMap = smoothSettings(new THREE.DataTexture(ao, size, size), THREE.NoColorSpace);
     material.normalMap = smoothSettings(new THREE.DataTexture(normal, size, size), THREE.NoColorSpace);
     material.roughnessMap = smoothSettings(new THREE.DataTexture(rough, size, size), THREE.NoColorSpace);
+    material.roughness = realisticRoughness(name) * material.userData.roughnessParam; // мокрая земля остаётся глаже
     material.needsUpdate = true;
     Object.values(old).forEach((t) => t.dispose());
     if (userFile(`${name}_n`)) replaceFromFile(material, 'normalMap', userFile(`${name}_n`));
@@ -140,6 +144,7 @@ export function getMaterial(name, { tint = '#ffffff', roughness = 1, flatShading
     if (userFile(`${name}_n`)) replaceFromFile(material, 'normalMap', userFile(`${name}_n`));
   }
   // сколько единиц сцены покрывает текстура — для разметки (у реалистичной картинки — свой масштаб)
+  material.userData.roughnessParam = roughness;
   material.userData.units = userFile(name) && realistic ? realistic.units : def.units;
   cache.set(key, material);
   return material;

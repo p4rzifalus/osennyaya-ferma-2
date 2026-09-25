@@ -24,6 +24,41 @@ function lanternLight(color, intensity, distance, castShadow, quality) {
   return light;
 }
 
+// Конус света под фонарём: мягкий прозрачный «луч» в вечернем воздухе.
+// Обычный предмет со светлой прозрачной текстурой — без дополнительных проходов.
+let coneTexture = null;
+function lightCone(height, radius) {
+  if (!coneTexture) { // яркий у фонаря, тает к земле
+    const canvas = document.createElement('canvas');
+    canvas.width = 4;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    const g = ctx.createLinearGradient(0, 0, 0, 64);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.5, 'rgba(255,255,255,0.35)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 4, 64);
+    coneTexture = new THREE.CanvasTexture(canvas);
+  }
+  const cone = new THREE.Mesh(
+    new THREE.ConeGeometry(radius, height, 24, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: new THREE.Color(LIGHTING.lanternColor).multiplyScalar(LIGHTING.coneStrength),
+      alphaMap: coneTexture,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      fog: false,
+    }),
+  );
+  cone.position.y = -height / 2; // вершина — у фонаря
+  cone.castShadow = false;
+  cone.renderOrder = 2;
+  return cone;
+}
+
 // Фонарь: стекло светится, внутри — источник света; сверху шапочка
 function lanternHead(scale = 1) {
   const head = new THREE.Group();
@@ -84,6 +119,11 @@ export function createLanterns(scene, quality) {
     group.position.set(p.x, 0, p.z);
     group.rotation.y = Math.atan2(-p.x, -p.z); // «рука» с фонарём смотрит к центру
     scene.add(group);
+    if (quality.godRays) { // конус света — поверх склеенного столба, отдельно
+      const cone = lightCone(1.25, 0.55);
+      cone.position.add(new THREE.Vector3(0, 1.25, 0.26));
+      group.add(cone);
+    }
     group.updateMatrixWorld(true);
     addLight(lightAt.clone().applyMatrix4(group.matrixWorld), LIGHTING.lanternColor, LIGHTING.lanternIntensity, LIGHTING.lanternDistance, true);
   }
@@ -91,6 +131,11 @@ export function createLanterns(scene, quality) {
   // Фонарик на дереве, над качелями
   const hanging = lanternHead(0.8);
   hanging.position.copy(LANTERNS.tree);
+  if (quality.godRays) {
+    const cone = lightCone(1.4, 0.6);
+    cone.position.y -= 0.1;
+    hanging.add(cone);
+  }
   scene.add(hanging);
   addLight(LANTERNS.tree, LIGHTING.lanternColor, LIGHTING.lanternIntensity * 0.6, LIGHTING.lanternDistance * 0.8, false);
 
