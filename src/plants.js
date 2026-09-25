@@ -2,10 +2,11 @@
 // Силуэты простые и крупные, чтобы хорошо читались в пикселях.
 import * as THREE from 'three';
 import { COLORS } from './config.js';
+import { glowMaterial } from './render/glow.js';
 
 function mesh(geo, color, x = 0, y = 0, z = 0, glow = false) {
   const material = glow
-    ? new THREE.MeshBasicMaterial({ color }) // «светится»: свет и тени на него не действуют
+    ? glowMaterial(color) // «светится»: свет и тени на него не действуют
     : new THREE.MeshLambertMaterial({ color });
   const m = new THREE.Mesh(geo, material);
   m.position.set(x, y, z);

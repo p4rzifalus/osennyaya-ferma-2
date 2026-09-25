@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { COLORS, GARDEN_SIZE, CELL_SIZE, BASKET_CELL, MIN_CELL_PX } from './config.js';
 import { cellToWorld } from './grid.js';
 import { createIsland } from './island.js';
+import { glowMaterial } from './render/glow.js';
 
 const isTouch = window.matchMedia('(pointer: coarse)').matches;
 const TOOLBAR_SPACE = 160; // сколько точек снизу занимают панель инструментов и ряд семян
@@ -20,7 +21,6 @@ function box(w, h, d, color, x = 0, y = 0, z = 0) {
 
 export function createScene(container) {
   const renderer = new THREE.WebGLRenderer();
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.shadowMap.enabled = true;
   renderer.domElement.style.display = 'block';
   container.appendChild(renderer.domElement);
@@ -34,8 +34,9 @@ export function createScene(container) {
   camera.lookAt(0, 0, 0);
 
   // Свет: мягкий общий + солнце с тенями
-  scene.add(new THREE.AmbientLight(0xffffff, 1.2));
-  const sun = new THREE.DirectionalLight(0xffffff, 2.2);
+  // небо светит голубоватым сверху, земля — тёплым снизу; солнце — тёплое, клонится к закату
+  scene.add(new THREE.HemisphereLight('#aabbee', '#5a4030', 1.3));
+  const sun = new THREE.DirectionalLight('#ffd2a0', 3.2);
   sun.position.set(-4, 10, 6);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
@@ -183,7 +184,7 @@ function createHouse(x, z) {
 
   // Фонарик у двери — светится
   house.add(box(0.04, 0.2, 0.12, COLORS.houseTrim, -0.98, 0.95, front + 0.06));
-  const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.12), new THREE.MeshBasicMaterial({ color: COLORS.lamp }));
+  const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.12), glowMaterial(COLORS.lamp));
   lamp.position.set(-0.98, 0.95, front + 0.16);
   house.add(lamp);
 
@@ -192,7 +193,9 @@ function createHouse(x, z) {
     const [fw, fd] = alongX ? [0.62, 0.05] : [0.05, 0.62];
     house.add(box(fw, 0.57, fd, COLORS.houseTrim, px, py - 0.06, pz));
     const [gw, gd] = alongX ? [0.5, 0.06] : [0.06, 0.5];
-    house.add(box(gw, 0.45, gd, COLORS.houseWindow, px + (alongX ? 0 : 0.01), py, pz + (alongX ? 0.01 : 0)));
+    const glass = box(gw, 0.45, gd, COLORS.houseWindow, px + (alongX ? 0 : 0.01), py, pz + (alongX ? 0.01 : 0));
+    glass.material = glowMaterial(COLORS.houseWindow, 0.6); // тёплый свет изнутри
+    house.add(glass);
     const [bw, bd] = alongX ? [0.04, 0.07] : [0.07, 0.04];
     house.add(box(bw, 0.45, bd, COLORS.houseTrim, px + (alongX ? 0 : 0.02), py, pz + (alongX ? 0.02 : 0)));
     const [hw, hd] = alongX ? [0.5, 0.07] : [0.07, 0.5];
@@ -212,7 +215,7 @@ function createHouse(x, z) {
   windowWithFrame(w / 2, 0.6, 0.1, false);
 
   // Круглое окошко на фронтоне
-  const attic = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.06, 12), new THREE.MeshBasicMaterial({ color: COLORS.lamp }));
+  const attic = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.06, 12), glowMaterial(COLORS.lamp, 0.8));
   attic.rotation.x = Math.PI / 2;
   attic.position.set(0, h + 0.42, (d + 0.3) / 2);
   house.add(attic);

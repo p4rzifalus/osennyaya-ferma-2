@@ -9,10 +9,15 @@ import { createInput } from './input.js';
 import { createUI, TOOLS } from './ui.js';
 import { createDecor } from './decor.js';
 import { detectQuality } from './render/quality.js';
+import { createPipeline } from './render/pipeline.js';
+import { createDevPanel, loadFxSettings } from './render/devpanel.js';
 import { loadGame, saveGame, clearSave } from './save.js';
 
 const quality = detectQuality();
 const { renderer, scene, camera, cameraControl, world, basket, landmarks, island } = createScene(document.body);
+const fx = loadFxSettings(quality);
+const pipeline = createPipeline(renderer, scene, camera, fx, quality);
+const devPanel = createDevPanel(fx, pipeline, quality);
 
 // ---------- Правила ----------
 let restarting = false; // во время «начать заново» не сохраняем
@@ -141,7 +146,8 @@ renderer.setAnimationLoop((now) => {
   placeOn(hoverFrame, input.hoverCell);
   placeOn(frontMarker, frontCell());
 
-  renderer.render(scene, camera);
+  pipeline.render(dt);
+  devPanel.tick(now);
 });
 
 // Только для разработки: доступ к игре из консоли браузера (game.restart() — начать заново)

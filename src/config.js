@@ -1,67 +1,64 @@
 // Все игровые числа — здесь. Меняй смело: после сохранения файла игра обновится сама.
 
-// Палитра, от тёмного к светлому
-export const PALETTE = ['#1a0a00', '#4a1c00', '#8c3a00', '#d9661a', '#ff9933', '#ffd9a0'];
-
-// Какой цвет палитры у чего
+// Цвета предметов (полный цвет; общий тон картинке задаёт цветокоррекция — см. FX ниже)
 export const COLORS = {
-  background: PALETTE[0],
-  ground: PALETTE[2],      // земля вокруг огорода
-  soil: PALETTE[1],        // клетки огорода
-  soilWet: PALETTE[0],     // политая земля
-  soilRipe: PALETTE[2],    // клетка со спелым урожаем
-  mound: PALETTE[2],       // бугорок над семечком
-  seed: PALETTE[4],
-  leaves: PALETTE[3],
-  carrot: PALETTE[4],
-  radish: PALETTE[5],
-  pumpkin: PALETTE[4],
-  stem: PALETTE[2],
-  sunflowerPetals: PALETTE[5],
-  sunflowerCenter: PALETTE[1],
-  mushroomStem: PALETTE[4],
-  mushroomCap: PALETTE[5],  // светится: на него не действуют свет и тени
-  houseWalls: PALETTE[3],
-  houseRoof: PALETTE[1],
-  houseDoor: PALETTE[0],
-  houseWindow: PALETTE[5],
-  houseTrim: PALETTE[1],     // брёвна, рамы, наличники
-  houseShutters: PALETTE[2],
-  houseStep: PALETTE[2],
-  houseAccent: PALETTE[4],   // дверная ручка
-  lamp: PALETTE[5],          // фонарик и круглое окошко — светятся
-  barrel: PALETTE[2],
-  logs: PALETTE[3],
-  cliff: PALETTE[2],         // бока острова
-  treeTrunk: PALETTE[1],
-  leavesA: PALETTE[4],       // осенняя листва
-  leavesB: PALETTE[3],
-  rope: PALETTE[4],
-  swingSeat: PALETTE[2],
-  boulder: PALETTE[3],
-  tallGrass: PALETTE[3],
-  basket: PALETTE[4],
-  basketInside: PALETTE[1],
-  basketFill: PALETTE[4],
-  moleBody: PALETTE[2],
-  moleSnout: PALETTE[3],
-  moleOveralls: PALETTE[1],
-  moleNose: PALETTE[4],
-  moleEyes: PALETTE[0],
-  molePaws: PALETTE[3],
-  moleHat: PALETTE[5],
-  moleHatBand: PALETTE[3],
-  stone: PALETTE[3],
-  stoneDark: PALETTE[1],
-  grass: PALETTE[3],
-  flower: PALETTE[5],
-  flowerCenter: PALETTE[4],
-  vane: PALETTE[4],
-  smoke: PALETTE[3],
-  fluff: PALETTE[5],
-  water: PALETTE[5],
-  hoverFrame: PALETTE[5],  // рамка клетки под курсором
-  frontCell: PALETTE[4],   // клетка перед кротом
+  background: '#171722',   // ночное небо вокруг острова
+  ground: '#7d7a3c',       // осенняя трава острова
+  soil: '#5c3d27',         // земля грядок
+  soilWet: '#3a2618',      // политая земля
+  soilRipe: '#86603a',     // клетка со спелым урожаем
+  mound: '#6e4a2f',        // бугорок над семечком
+  seed: '#e6c27a',
+  leaves: '#5c8a34',       // ботва
+  carrot: '#f07a1a',
+  radish: '#d63a55',
+  pumpkin: '#e88420',
+  stem: '#6b7a2a',
+  sunflowerPetals: '#f5c542',
+  sunflowerCenter: '#4a2a12',
+  mushroomStem: '#e8dcc0',
+  mushroomCap: '#6fe3ff',  // светится
+  houseWalls: '#c9a37b',
+  houseRoof: '#8c3b2b',
+  houseDoor: '#4a2c1a',
+  houseWindow: '#ffd08a',  // светится
+  houseTrim: '#5a3a22',    // брёвна, рамы, наличники
+  houseShutters: '#3f6b5a',
+  houseStep: '#8a877e',
+  houseAccent: '#d4a84a',  // дверная ручка
+  lamp: '#ffcf7a',         // фонарик и круглое окошко — светятся
+  barrel: '#8a5a32',
+  logs: '#a0703f',
+  cliff: '#6b4a32',        // бока острова
+  treeTrunk: '#5a3d28',
+  leavesA: '#e0752a',      // осенняя листва
+  leavesB: '#c2482a',
+  rope: '#d8c08a',
+  swingSeat: '#8a5a32',
+  boulder: '#8d8a80',
+  tallGrass: '#b8a24a',
+  basket: '#c08a4a',
+  basketInside: '#5a3a20',
+  basketFill: '#f07a1a',
+  moleBody: '#4a3a36',
+  moleSnout: '#e8a8a0',
+  moleOveralls: '#3a5a8a',
+  moleNose: '#ff8fa0',
+  moleEyes: '#111111',
+  molePaws: '#e8b0a0',
+  moleHat: '#e8cf8a',
+  moleHatBand: '#a0302a',
+  stone: '#9a968a',
+  stoneDark: '#6a665c',
+  grass: '#8a9a3a',
+  flower: '#e85a8a',
+  flowerCenter: '#f5c542',
+  vane: '#3a3a3a',
+  smoke: '#c8c0b8',
+  fluff: '#fff4dc',
+  water: '#8ad0ff',
+  hoverFrame: '#fff4dc',  // рамка клетки под курсором
+  frontCell: '#ffcf7a',   // клетка перед кротом
 };
 
 // Огород
@@ -127,4 +124,18 @@ export const QUALITY = {
   medium: { pixelScale: 3, maxDpr: 1.5, shadowMap: 2048, ao: false, godRays: true, particles: 0.7 },
   high:   { pixelScale: 3, maxDpr: 2, shadowMap: 2048, ao: true, godRays: true, particles: 1 },
   ultra:  { pixelScale: 2, maxDpr: 2, shadowMap: 4096, ao: true, godRays: true, particles: 1.5 },
+};
+
+// Сила свечения светящихся предметов (фонарь, окна, гриб): больше 1 — «горячее» белого, ловит bloom
+export const GLOW = 3;
+
+// Картинка по умолчанию (панель G меняет, «скопировать значения» — чтобы вписать сюда)
+export const FX = {
+  bloomIntensity: 1.2,  // сила свечения
+  bloomThreshold: 0.9,  // с какой яркости начинает светиться
+  bloomRadius: 0.7,     // как широко расходится свечение
+  lut: 'autumn',        // цветокоррекция: autumn, sunset, dusk, neutral
+  lutStrength: 1,
+  vignette: 0.5,        // затемнение по краям
+  grain: 0.12,          // плёночное зерно
 };
