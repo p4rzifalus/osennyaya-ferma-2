@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "ferma-2", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "--", "--host", "--port", "5174", "--strictPort"], "port": 5174 }
+  ]
+}
