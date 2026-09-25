@@ -29,17 +29,15 @@ export function createSfx(engine) {
       tone(engine, FX, { when: t + 0.3, freq: 110, freqEnd: 55, glide: 0.1, gain: 0.35, decay: 0.14 });
     },
 
-    // Полив: журчание струи и пузырьки капель
+    // Полив: только бульканье — пузырьки капель, без шипения
     watered() {
       if (!ready()) return;
       const t = now();
-      noise(engine, FX, { when: t, type: 'bandpass', freq: 1800, freqEnd: 1200, q: 1.2, gain: 0.12, attack: 0.12, hold: 0.35, decay: 0.3, reverb: 0.15 });
-      for (let i = 0; i < 16; i++) {
-        const when = t + 0.15 + rand(0, 0.6);
-        const f = rand(500, 1300);
-        tone(engine, FX, { when, freq: f, freqEnd: f * rand(1.5, 2.2), glide: 0.03, gain: rand(0.03, 0.07), decay: 0.04, pan: rand(-0.3, 0.3) });
+      for (let i = 0; i < 22; i++) {
+        const when = t + 0.12 + rand(0, 0.75);
+        const f = rand(450, 1300);
+        tone(engine, FX, { when, freq: f, freqEnd: f * rand(1.5, 2.2), glide: 0.03, gain: rand(0.04, 0.08), decay: 0.045, pan: rand(-0.3, 0.3) });
       }
-      noise(engine, FX, { when: t + 0.55, color: 'brown', type: 'lowpass', freq: 500, gain: 0.25, attack: 0.05, decay: 0.3 }); // вода уходит в землю
     },
 
     // Сбор: шелест ботвы и сочный «чпок» — овощ выскочил из земли
@@ -71,21 +69,17 @@ export function createSfx(engine) {
       });
     },
 
-    // Шаг крота: чёткий «тук» лапки + поверхность. По грядке — земля шуршит, по дорожке — хрустят камешки.
+    // Шаг крота по песку: лёгкое «шшк» и россыпь песчинок, без низкого удара.
+    // По грядке — чуть глуше и мягче, по дорожке — светлее и суше.
     step(onSoil) {
       if (!ready()) return;
       const g = engine.volumes.steps; // панель G меняет на ходу
       const t = now();
-      const f = rand(150, 190);
-      tone(engine, FX, { when: t, freq: f, freqEnd: f * 0.5, glide: 0.03, gain: 0.45 * g, attack: 0.002, decay: 0.045 });
-      if (onSoil) {
-        noise(engine, FX, { when: t, color: 'brown', type: 'bandpass', freq: rand(900, 1300), q: 1.2, gain: 0.7 * g, attack: 0.002, decay: 0.04 });
-        noise(engine, FX, { when: t, type: 'highpass', freq: 3500, gain: 0.05 * g, attack: 0.001, decay: 0.012 });
-      } else {
-        // три камешка подряд, с разницей в сотые доли секунды
-        [0, rand(0.008, 0.014), rand(0.018, 0.028)].forEach((d, i) => {
-          noise(engine, FX, { when: t + d, type: 'bandpass', freq: rand(2500, 4500), q: 3, gain: (0.3 - i * 0.07) * g, attack: 0.001, decay: 0.02 });
-        });
+      const bright = onSoil ? 0.75 : 1; // грядка звучит ниже
+      noise(engine, FX, { when: t, type: 'bandpass', freq: rand(2600, 3400) * bright, q: 0.8, gain: 0.3 * g, attack: 0.006, decay: 0.055 });
+      const grains = onSoil ? 4 : 6;
+      for (let i = 0; i < grains; i++) {
+        noise(engine, FX, { when: t + rand(0, 0.045), type: 'bandpass', freq: rand(4000, 8000) * bright, q: 2, gain: rand(0.07, 0.16) * g, attack: 0.001, decay: rand(0.006, 0.012) });
       }
     },
 
