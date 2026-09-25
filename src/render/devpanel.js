@@ -42,6 +42,11 @@ export function createDevPanel(settings, pipeline, quality, weather) {
   glow.add(settings, 'bloomThreshold', 0, 2, 0.01).name('порог яркости').onChange(changed);
   glow.add(settings, 'bloomRadius', 0, 1, 0.01).name('размах').onChange(changed);
 
+  const tilt = gui.addFolder('Миниатюра (tilt-shift)');
+  tilt.add(settings, 'tiltFocus', 0.1, 1.5, 0.01).name('резкая полоса').onChange(changed);
+  tilt.add(settings, 'tiltFeather', 0, 1, 0.01).name('мягкость края').onChange(changed);
+  tilt.add(settings, 'tiltOffset', -0.5, 0.5, 0.01).name('сдвиг полосы').onChange(changed);
+
   const shade = gui.addFolder('Затенения в углах');
   shade.add(settings, 'aoIntensity', 0, 6, 0.1).name('сила').onChange(changed);
   shade.add(settings, 'aoRadius', 0.1, 4, 0.05).name('радиус').onChange(changed);

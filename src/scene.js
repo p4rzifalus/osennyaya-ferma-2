@@ -1,6 +1,6 @@
 // Сцена: камера, свет, земля, огород, домик, корзинка, подсветки клеток.
 import * as THREE from 'three';
-import { COLORS, GARDEN_SIZE, CELL_SIZE, BASKET_CELL, MIN_CELL_PX } from './config.js';
+import { COLORS, GARDEN_SIZE, CELL_SIZE, BASKET_CELL, MIN_CELL_PX, CAMERA } from './config.js';
 import { cellToWorld } from './grid.js';
 import { createIsland } from './island.js';
 import { glowMaterial } from './render/glow.js';
@@ -103,15 +103,21 @@ export function createScene(container) {
   // Высота экрана над панелью инструментов
   const freeHeight = () => Math.max(window.innerHeight - TOOLBAR_SPACE, window.innerHeight * 0.5);
 
+  const breath = new THREE.Vector2(); // «дыхание» камеры — мелкий сдвиг поверх основного положения
+  let debugView = null;               // только для разработки: крупный план (см. cameraControl.closeUp)
+
   function applyView() {
     clampCenter();
     const w = window.innerWidth;
     const h = window.innerHeight;
-    const halfW = w / 2 / view.scale;
-    const top = view.center.y + freeHeight() / 2 / view.scale;
+    const scale = debugView ? debugView.scale : view.scale;
+    const cx = (debugView ? debugView.x : view.center.x) + breath.x;
+    const cy = (debugView ? debugView.y : view.center.y) + breath.y;
+    const halfW = w / 2 / scale;
+    const top = cy + freeHeight() / 2 / scale;
     Object.assign(camera, {
-      left: view.center.x - halfW, right: view.center.x + halfW,
-      top, bottom: top - h / view.scale,
+      left: cx - halfW, right: cx + halfW,
+      top, bottom: top - h / scale,
     });
     camera.updateProjectionMatrix();
   }
@@ -128,11 +134,39 @@ export function createScene(container) {
   resize();
   window.addEventListener('resize', resize);
 
+  let lastPan = -Infinity; // когда игрок последний раз двигал сцену пальцем
+
   const cameraControl = {
     // Сдвинуть сцену вслед за пальцем (в точках экрана)
     panBy(dxPx, dyPx) {
       view.center.x -= dxPx / view.scale;
       view.center.y += dyPx / view.scale;
+      lastPan = performance.now();
+      applyView();
+    },
+
+    // Каждый кадр: лёгкое покачивание камеры; на телефоне — мягко догнать крота, если он ушёл к краю
+    update(dt, time, followPos) {
+      breath.set(Math.sin(time * 0.37) * CAMERA.breath, Math.sin(time * 0.23 + 1) * CAMERA.breath * 0.6);
+      const canFollow = isTouch && CAMERA.followOnPhone && followPos && performance.now() - lastPan > 3000;
+      if (canFollow) {
+        const p = followPos.clone().applyMatrix4(camera.matrixWorldInverse);
+        const halfW = (window.innerWidth / 2 / view.scale) * 0.55; // «спокойная зона» — середина экрана
+        const halfH = (freeHeight() / 2 / view.scale) * 0.55;
+        const dx = p.x - view.center.x;
+        const dy = p.y - view.center.y;
+        const k = Math.min(1, dt * 2.5);
+        if (Math.abs(dx) > halfW) view.center.x += (dx - Math.sign(dx) * halfW) * k;
+        if (Math.abs(dy) > halfH) view.center.y += (dy - Math.sign(dy) * halfH) * k;
+      }
+      applyView();
+    },
+
+    // Только для разработки: крупный план точки сцены (size — сколько единиц по ширине экрана); null — вернуть
+    closeUp(worldPos, size = 6) {
+      if (!worldPos) { debugView = null; applyView(); return; }
+      const p = worldPos.clone().applyMatrix4(camera.matrixWorldInverse);
+      debugView = { x: p.x, y: p.y - freeHeight() / 2 / (window.innerWidth / size) + window.innerHeight / 2 / (window.innerWidth / size), scale: window.innerWidth / size };
       applyView();
     },
     // Поставить точку сцены в центр экрана

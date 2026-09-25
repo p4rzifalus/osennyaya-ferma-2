@@ -1,4 +1,5 @@
 // Точка входа: собираем правила игры (game.js), картинку и управление, запускаем игровой цикл.
+import * as THREE from 'three';
 import { MOLE_START, BASKET_CELL } from './config.js';
 import { cellToWorld, worldToCell, isInGarden, findPathToNeighbor } from './grid.js';
 import { createGame, isBasket } from './game.js';
@@ -166,6 +167,7 @@ renderer.setAnimationLoop((now) => {
   last = now;
 
   mole.update(dt, input.getMoveDir(), world);
+  cameraControl.update(dt, now / 1000, mole.position);
   gardenView.update();
   decor.update(dt, now / 1000);
   weather.update(dt, decor.wind);
@@ -184,7 +186,9 @@ renderer.setAnimationLoop((now) => {
 // Только для разработки: доступ к игре из консоли браузера (game.restart() — начать заново)
 if (import.meta.env.DEV) {
   window.game = {
-    game, mole, camera, scene, restart, quality, pipeline, renderer, weather, effects, decor,
+    game, mole, camera, scene, restart, quality, pipeline, renderer, weather, effects, decor, cameraControl,
+    // крупный план: game.closeUp(x, y, z, ширина) ; game.closeUp() — вернуть обычный вид
+    closeUp(x, y, z, size) { cameraControl.closeUp(x === undefined ? null : new THREE.Vector3(x, y, z), size); },
     garden: game.garden,
     cheat(extraCoins = 1000) { game.addCoins(extraCoins); },
   };

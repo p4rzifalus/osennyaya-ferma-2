@@ -137,10 +137,10 @@ export const MOLE_REACH = 0.55;
 //   lanternShadows — сколько фонарей отбрасывают тени (тени от фонарей дорогие)
 //   lanternLights  — сколько фонарей по-настоящему светят (остальные — только светящееся стекло)
 export const QUALITY = {
-  low:    { msaa: 0, maxDpr: 1, shadowMap: 1024, ao: false, godRays: false, particles: 0.4, lanternShadows: 0, lanternLights: 3 },
-  medium: { msaa: 2, maxDpr: 1.25, shadowMap: 1024, ao: false, godRays: true, particles: 0.7, lanternShadows: 0, lanternLights: 5 },
-  high:   { msaa: 2, maxDpr: 1.5, shadowMap: 2048, ao: true, godRays: true, particles: 1, lanternShadows: 1, lanternLights: 7 },
-  ultra:  { msaa: 4, maxDpr: 2, shadowMap: 4096, ao: true, godRays: true, particles: 1.5, lanternShadows: 3, lanternLights: 7 },
+  low:    { tiltShift: false, msaa: 0, maxDpr: 1, shadowMap: 1024, ao: false, godRays: false, particles: 0.4, lanternShadows: 0, lanternLights: 3 },
+  medium: { tiltShift: true, msaa: 2, maxDpr: 1.25, shadowMap: 1024, ao: false, godRays: true, particles: 0.7, lanternShadows: 0, lanternLights: 5 },
+  high:   { tiltShift: true, msaa: 2, maxDpr: 1.5, shadowMap: 2048, ao: true, godRays: true, particles: 1, lanternShadows: 1, lanternLights: 7 },
+  ultra:  { tiltShift: true, msaa: 4, maxDpr: 2, shadowMap: 4096, ao: true, godRays: true, particles: 1.5, lanternShadows: 3, lanternLights: 7 },
 };
 
 // Вечерний свет
@@ -201,4 +201,13 @@ export const FX = {
   grain: 0.12,          // плёночное зерно
   aoIntensity: 2.5,     // затенения в углах: сила
   aoRadius: 1.2,        // и насколько далеко от угла
+  tiltFocus: 0.75,      // миниатюра: ширина резкой полосы по середине экрана
+  tiltFeather: 0.35,    // насколько плавно резкое переходит в размытое
+  tiltOffset: 0.05,     // сдвиг резкой полосы вверх/вниз
+};
+
+// Камера
+export const CAMERA = {
+  breath: 0.035,        // «дыхание» камеры: насколько плавно покачивается (0 — стоит неподвижно)
+  followOnPhone: true,  // на телефоне камера мягко следует за кротом, если он уходит к краю
 };

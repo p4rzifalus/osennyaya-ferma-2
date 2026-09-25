@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import {
   EffectComposer, EffectPass, RenderPass,
-  BloomEffect, ToneMappingEffect, ToneMappingMode, LUT3DEffect, VignetteEffect, NoiseEffect, BlendFunction,
+  BloomEffect, TiltShiftEffect, KernelSize, ToneMappingEffect, ToneMappingMode, LUT3DEffect, VignetteEffect, NoiseEffect, BlendFunction,
 } from 'postprocessing';
 import { N8AOPostPass } from 'n8ao';
 import { createLUTs } from './luts.js';
@@ -28,6 +28,14 @@ export function createPipeline(renderer, scene, camera, settings, quality) {
     composer.addPass(ao);
   }
 
+  // Tilt-shift: верх и низ кадра мягко размыты — будто смотришь на маленькую диораму.
+  // Отдельным проходом (размытие нельзя смешивать с другими размытиями в одном проходе)
+  let tiltShift = null;
+  if (quality.tiltShift) {
+    tiltShift = new TiltShiftEffect({ kernelSize: KernelSize.MEDIUM, resolutionScale: 0.5 });
+    composer.addPass(new EffectPass(camera, tiltShift));
+  }
+
   const bloom = new BloomEffect({ mipmapBlur: true, luminanceSmoothing: 0.2 });
   const toneMapping = new ToneMappingEffect({ mode: ToneMappingMode.AGX });
   const luts = createLUTs();
@@ -45,6 +53,11 @@ export function createPipeline(renderer, scene, camera, settings, quality) {
     lut.blendMode.opacity.value = settings.lutStrength;
     vignette.darkness = settings.vignette;
     grain.blendMode.opacity.value = settings.grain;
+    if (tiltShift) {
+      tiltShift.focusArea = settings.tiltFocus;
+      tiltShift.feather = settings.tiltFeather;
+      tiltShift.offset = settings.tiltOffset;
+    }
     if (ao) {
       ao.configuration.intensity = settings.aoIntensity;
       ao.configuration.aoRadius = settings.aoRadius;
