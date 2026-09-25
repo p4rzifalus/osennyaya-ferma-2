@@ -14,7 +14,7 @@ export function loadFxSettings(quality) {
   return settings;
 }
 
-export function createDevPanel(settings, pipeline, quality) {
+export function createDevPanel(settings, pipeline, quality, weather) {
   const save = () => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -51,6 +51,12 @@ export function createDevPanel(settings, pipeline, quality) {
   color.add(settings, 'lutStrength', 0, 1, 0.05).name('сила коррекции').onChange(changed);
   color.add(settings, 'vignette', 0, 1, 0.05).name('виньетка').onChange(changed);
   color.add(settings, 'grain', 0, 0.5, 0.01).name('зерно').onChange(changed);
+
+  if (weather) {
+    const sky = gui.addFolder('Погода');
+    sky.add({ rain: () => weather.setRain(true) }, 'rain').name('дождь сейчас');
+    sky.add({ clear: () => weather.setRain(false) }, 'clear').name('ясно');
+  }
 
   gui.add({
     copy() {

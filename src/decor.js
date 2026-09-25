@@ -213,11 +213,6 @@ export function createDecor(scene, landmarks) {
     scene.add(leaf);
   }
 
-  // Брызги при поливе
-  const dropGeo = new THREE.BoxGeometry(0.08, 0.12, 0.08);
-  const dropMat = new THREE.MeshBasicMaterial({ color: COLORS.water });
-  const drops = [];
-
   // Ветер: направление медленно гуляет, сила то нарастает, то стихает
   const wind = new THREE.Vector3();
   let windStrength = 0;
@@ -226,15 +221,12 @@ export function createDecor(scene, landmarks) {
   mergeStatic(tree, (o) => o === swingPivot); // дерево — одним куском, качели отдельно (они двигаются)
 
   return {
-    // Брызги над клеткой
-    splash(worldPos) {
-      for (let i = 0; i < 12; i++) {
-        const m = new THREE.Mesh(dropGeo, dropMat);
-        m.position.copy(worldPos).add(new THREE.Vector3(between(-0.25, 0.25), between(0.5, 0.8), between(-0.25, 0.25)));
-        drops.push({ mesh: m, velocity: new THREE.Vector3(between(-0.4, 0.4), between(0, 1), between(-0.4, 0.4)), life: 0.9 });
-        scene.add(m);
-      }
+    // ветер — для дождя и частиц
+    wind,
+    get windStrength() {
+      return windStrength;
     },
+    fireflyVisibility: 1, // дождь гасит светлячков
 
     update(dt, time) {
       const angle = 0.8 + Math.sin(time * 0.05) * 1.2 + Math.sin(time * 0.13) * 0.4;
@@ -265,7 +257,7 @@ export function createDecor(scene, landmarks) {
         if (f.age > f.life + f.rest) newFireflySpot(f);
         // плавно загорается и гаснет, в середине чуть мерцает
         const lit = f.age > 0 && f.age < f.life ? Math.sin((Math.PI * f.age) / f.life) : 0;
-        const glow = lit * (0.75 + 0.25 * Math.sin(time * 6 + f.phase));
+        const glow = lit * (0.75 + 0.25 * Math.sin(time * 6 + f.phase)) * this.fireflyVisibility;
         // кружит вокруг своей точки, покачиваясь вверх-вниз
         const a = time * f.spin + f.phase;
         fireflyDummy.position.set(
@@ -294,16 +286,6 @@ export function createDecor(scene, landmarks) {
         if (p.z < island.minZ - 1) p.z = island.maxZ + 1;
       }
 
-      for (let i = drops.length - 1; i >= 0; i--) {
-        const d = drops[i];
-        d.life -= dt;
-        d.velocity.y -= 6 * dt;
-        d.mesh.position.addScaledVector(d.velocity, dt);
-        if (d.life <= 0 || d.mesh.position.y < 0.05) {
-          scene.remove(d.mesh);
-          drops.splice(i, 1);
-        }
-      }
     },
   };
 }

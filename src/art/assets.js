@@ -122,6 +122,9 @@ function replaceFromFile(material, slot, url) {
 
 const cache = new Map();
 
+// Все созданные материалы с текстурами (для намокания под дождём)
+export const allMaterials = () => cache.values();
+
 // Материал по имени текстуры; tint — цвет, на который умножается текстура (для «нейтральных» текстур)
 export function getMaterial(name, { tint = '#ffffff', roughness = 1, flatShading = false } = {}) {
   const key = `${name}|${tint}|${roughness}|${flatShading}`;

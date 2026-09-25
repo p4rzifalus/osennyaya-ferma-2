@@ -146,6 +146,8 @@ export function createLanterns(scene, quality) {
 
   let frame = 0;
   return {
+    // где висят фонари — для пылинок в их свете
+    positions: lights.map((l) => l.light.position.clone()),
     // Живой огонь: свет чуть подрагивает. Тени фонарей обновляются раз в 6 кадров (по очереди) —
     // двигается только крот, а каждая такая тень — это 6 перерисовок сцены.
     update(time) {

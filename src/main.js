@@ -2,6 +2,7 @@
 import { MOLE_START, BASKET_CELL } from './config.js';
 import { cellToWorld, worldToCell, isInGarden, findPathToNeighbor } from './grid.js';
 import { createGame, isBasket } from './game.js';
+import { RIPE } from './garden.js';
 import { createScene, createHoverFrame, createFrontMarker } from './scene.js';
 import { Mole } from './mole.js';
 import { GardenView } from './world/garden-view.js';
@@ -11,6 +12,8 @@ import { createDecor } from './decor.js';
 import { detectQuality } from './render/quality.js';
 import { createPipeline } from './render/pipeline.js';
 import { createLighting } from './render/lighting.js';
+import { createWeather } from './render/weather.js';
+import { createEffects } from './world/effects.js';
 import { createLanterns } from './world/lanterns.js';
 import { applySkyReflex } from './render/sky-reflex.js';
 import { createDevPanel, loadFxSettings } from './render/devpanel.js';
@@ -18,11 +21,13 @@ import { loadGame, saveGame, clearSave } from './save.js';
 
 const quality = detectQuality();
 const { renderer, scene, camera, cameraControl, world, basket, landmarks, island } = createScene(document.body);
-createLighting(renderer, scene, quality, landmarks.island); // тени — только над ровной серединой острова
+const lighting = createLighting(renderer, scene, quality, landmarks.island); // тени — только над ровной серединой острова
 const lanterns = createLanterns(scene, quality);
+const effects = createEffects(scene, quality, lanterns.positions);
+const weather = createWeather(scene, quality, lighting, landmarks.island);
 const fx = loadFxSettings(quality);
 const pipeline = createPipeline(renderer, scene, camera, fx, quality);
-const devPanel = createDevPanel(fx, pipeline, quality);
+const devPanel = createDevPanel(fx, pipeline, quality, weather);
 
 // ---------- Правила ----------
 let restarting = false; // во время «начать заново» не сохраняем
@@ -30,7 +35,11 @@ const game = createGame({
   onHint: (text, ms) => ui.hint(text, ms),
   onEffect(name, cell) {
     mole.playAction(); // крот наклоняется: сажает, поливает, собирает, кладёт в корзинку
-    if (name === 'watered') decor.splash(cellToWorld(cell.x, cell.z));
+    const at = cellToWorld(cell.x, cell.z);
+    if (name === 'planted') effects.dirt(at);
+    if (name === 'watered') effects.water(mole.frontPoint.lerp(mole.position, 0.4), at);
+    if (name === 'harvested') effects.sparkle(at);
+    if (name === 'sold') effects.coins(at);
   },
   onChange: refresh,
 });
@@ -129,6 +138,13 @@ window.addEventListener('keydown', (e) => {
 });
 
 // ---------- Игровой цикл ----------
+// Где растут спелые светящиеся грибы — над ними поднимаются споры
+function ripeMushrooms() {
+  return game.garden.cells
+    .filter((c) => c.plant === 'mushroom' && game.garden.stage(c) === RIPE)
+    .map((c) => cellToWorld(c.x, c.z));
+}
+
 // Показать подсветку на клетке (или спрятать)
 function placeOn(object, cell) {
   object.visible = !!cell;
@@ -152,6 +168,9 @@ renderer.setAnimationLoop((now) => {
   mole.update(dt, input.getMoveDir(), world);
   gardenView.update();
   decor.update(dt, now / 1000);
+  weather.update(dt, decor.wind);
+  decor.fireflyVisibility = 1 - weather.wetness; // в дождь светлячки прячутся
+  effects.update(dt, { ripeMushrooms: ripeMushrooms(), visibility: 1 - weather.wetness });
   island.update(now / 1000);
   lanterns.update(now / 1000);
 
@@ -165,7 +184,7 @@ renderer.setAnimationLoop((now) => {
 // Только для разработки: доступ к игре из консоли браузера (game.restart() — начать заново)
 if (import.meta.env.DEV) {
   window.game = {
-    game, mole, camera, scene, restart, quality, pipeline, renderer,
+    game, mole, camera, scene, restart, quality, pipeline, renderer, weather, effects, decor,
     garden: game.garden,
     cheat(extraCoins = 1000) { game.addCoins(extraCoins); },
   };
